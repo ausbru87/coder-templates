@@ -41,6 +41,7 @@ jobs:
         working-directory: ${{ matrix.template_path }}
         run: |
           echo "Validating template in directory: ${{ matrix.template_path }}"
+          terraform init -backend=false
           terraform validate
 
       - name: Get short commit SHA to use as template version name
