@@ -57,10 +57,18 @@ jobs:
         run: |
           echo "Pushing template: $TEMPLATE_NAME from directory: $(pwd)"
           ls -la
+          echo "Checking Terraform files:"
+          cat main.tf | head -10
+          echo "Running terraform init again before push..."
+          terraform init -backend=false
+          echo "Testing terraform plan..."
+          terraform plan -var-file=<(echo '{}') || echo "Plan failed, but continuing..."
+          echo "Pushing template..."
           coder templates push $TEMPLATE_NAME \
             --activate=false \
             --name ${{ steps.name.outputs.version_name }} \
             --message "${{ steps.message.outputs.pr_title }}" \
+            --directory . \
             --yes
 
       - name: Create a test workspace and run some example commands
