@@ -1,265 +1,34 @@
-# .github/workflows/test-and-deploy-templates.yml
-name: Test and Deploy Coder Templates
+# .github/workflows/simple-demo.yml
+name: Simple Template Deploy
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'product-demo/**'
-      - 'better-vnc/**'
-      - '**/*.tf'
-  pull_request:
-    paths:
-      - 'product-demo/**'
-      - 'better-vnc/**'
-      - '**/*.tf'
   workflow_dispatch:
 
 jobs:
-  # Step 1: Validate Terraform syntax
-  validate-templates:
+  deploy-demo-templates:
     runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        template:
-          - path: "product-demo/devcontainer"
-          - path: "product-demo/data-science"
-          - path: "better-vnc"
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Validate template
-        uses: coder/validate-coder-template@v1
-        with:
-          directory: ${{ matrix.template.path }}
-
-  # Step 2: Deploy templates to staging (only on main branch)
-  deploy-to-staging:
-    runs-on: ubuntu-latest
-    needs: validate-templates
-    if: github.ref == 'refs/heads/main'
     
     strategy:
       matrix:
         include:
-          - name: "staging-devcontainer"
+          - name: "business-demo-devcontainer"
             path: "product-demo/devcontainer"
-          - name: "staging-datascience"
+          - name: "business-demo-datascience"
             path: "product-demo/data-science"
-          - name: "staging-desktop"
-            path: "better-vnc"
-    
-    outputs:
-      templates: ${{ toJson(strategy.matrix) }}
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Deploy staging template
+      - name: Deploy ${{ matrix.name }}
         uses: coder/deploy-coder-template@v1
         with:
           name: ${{ matrix.name }}
           directory: ${{ matrix.path }}
           url: ${{ secrets.CODER_URL }}
           token: ${{ secrets.CODER_SESSION_TOKEN }}
-          message: "Staging deployment for testing - ${{ github.sha }}"
-
-  # Step 3: Create test workspaces and verify they work
-  test-workspaces:
-    runs-on: ubuntu-latest
-    needs: deploy-to-staging
-    if: github.ref == 'refs/heads/main'
-    
-    strategy:
-      matrix:
-        include:
-          - template: "staging-devcontainer"
-            workspace: "test-devcontainer-${{ github.run_number }}"
-            health_check: "http://localhost:13337/healthz"
-          - template: "staging-datascience"
-            workspace: "test-datascience-${{ github.run_number }}"
-            health_check: "http://localhost:8888/healthz/"
-          - template: "staging-desktop"
-            workspace: "test-desktop-${{ github.run_number }}"
-            health_check: "http://localhost:6901"
-    
-    steps:
-      - uses: actions/checkout@v4
+          message: "Demo template deployed automatically"
       
-      - name: Install Coder CLI
-        run: |
-          curl -fsSL https://coder.com/install.sh | sh
-          sudo mv coder /usr/local/bin/coder
-      
-      - name: Login to Coder
-        run: |
-          coder login ${{ secrets.CODER_URL }} --token ${{ secrets.CODER_SESSION_TOKEN }}
-      
-      - name: Create test workspace
-        id: create_workspace
-        run: |
-          echo "Creating test workspace: ${{ matrix.workspace }}"
-          coder create ${{ matrix.workspace }} \
-            --template ${{ matrix.template }} \
-            --parameter-file /dev/stdin << EOF
-          {}
-          EOF
-          
-          echo "workspace_name=${{ matrix.workspace }}" >> $GITHUB_OUTPUT
-      
-      - name: Wait for workspace to be ready
-        timeout-minutes: 10
-        run: |
-          echo "Waiting for workspace to be ready..."
-          while true; do
-            status=$(coder list --output json | jq -r '.[] | select(.name == "${{ matrix.workspace }}") | .latest_build.status')
-            echo "Workspace status: $status"
-            
-            if [ "$status" = "running" ]; then
-              echo "✅ Workspace is running!"
-              break
-            elif [ "$status" = "failed" ]; then
-              echo "❌ Workspace failed to start"
-              coder logs ${{ matrix.workspace }}
-              exit 1
-            fi
-            
-            sleep 30
-          done
-      
-      - name: Test workspace health
-        timeout-minutes: 5
-        run: |
-          echo "Testing workspace health..."
-          max_attempts=10
-          attempt=1
-          
-          while [ $attempt -le $max_attempts ]; do
-            echo "Health check attempt $attempt/$max_attempts"
-            
-            if coder ssh ${{ matrix.workspace }} -- curl -f ${{ matrix.health_check }} > /dev/null 2>&1; then
-              echo "✅ Health check passed!"
-              break
-            fi
-            
-            if [ $attempt -eq $max_attempts ]; then
-              echo "❌ Health check failed after $max_attempts attempts"
-              echo "Workspace logs:"
-              coder logs ${{ matrix.workspace }}
-              exit 1
-            fi
-            
-            sleep 30
-            ((attempt++))
-          done
-      
-      - name: Test basic functionality
-        run: |
-          echo "Testing basic workspace functionality..."
-          
-          # Test that we can execute commands
-          coder ssh ${{ matrix.workspace }} -- whoami
-          coder ssh ${{ matrix.workspace }} -- pwd
-          coder ssh ${{ matrix.workspace }} -- ls -la
-          
-          # Test specific functionality based on template
-          case "${{ matrix.template }}" in
-            "staging-devcontainer")
-              echo "Testing development environment..."
-              coder ssh ${{ matrix.workspace }} -- which code-server
-              coder ssh ${{ matrix.workspace }} -- which git
-              coder ssh ${{ matrix.workspace }} -- which docker || echo "Docker not available (expected in some environments)"
-              ;;
-            "staging-datascience")
-              echo "Testing data science environment..."
-              coder ssh ${{ matrix.workspace }} -- which jupyter
-              coder ssh ${{ matrix.workspace }} -- python3 -c "import pandas; print('pandas works')"
-              ;;
-            "staging-desktop")
-              echo "Testing desktop environment..."
-              coder ssh ${{ matrix.workspace }} -- ps aux | grep vnc || echo "VNC process check"
-              ;;
-          esac
-          
-          echo "✅ Basic functionality tests passed!"
-      
-      - name: Cleanup test workspace
-        if: always()
-        run: |
-          echo "Cleaning up test workspace: ${{ matrix.workspace }}"
-          coder delete ${{ matrix.workspace }} --yes || echo "Workspace may not exist"
-
-  # Step 4: Deploy to production if tests pass
-  deploy-to-production:
-    runs-on: ubuntu-latest
-    needs: [deploy-to-staging, test-workspaces]
-    if: github.ref == 'refs/heads/main'
-    
-    strategy:
-      matrix:
-        include:
-          - staging_name: "staging-devcontainer"
-            prod_name: "business-demo-devcontainer"
-            path: "product-demo/devcontainer"
-          - staging_name: "staging-datascience"
-            prod_name: "business-demo-datascience"
-            path: "product-demo/data-science"
-          - staging_name: "staging-desktop"
-            prod_name: "business-demo-desktop"
-            path: "better-vnc"
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Deploy production template
-        uses: coder/deploy-coder-template@v1
-        with:
-          name: ${{ matrix.prod_name }}
-          directory: ${{ matrix.path }}
-          url: ${{ secrets.CODER_URL }}
-          token: ${{ secrets.CODER_SESSION_TOKEN }}
-          message: "✅ Production deployment - Tests passed - ${{ github.sha }}"
-      
-      - name: Install Coder CLI for cleanup
-        run: |
-          curl -fsSL https://coder.com/install.sh | sh
-          sudo mv coder /usr/local/bin/coder
-      
-      - name: Login to Coder
-        run: |
-          coder login ${{ secrets.CODER_URL }} --token ${{ secrets.CODER_SESSION_TOKEN }}
-      
-      - name: Remove staging template
-        run: |
-          echo "Cleaning up staging template: ${{ matrix.staging_name }}"
-          coder templates delete ${{ matrix.staging_name }} --yes || echo "Staging template may not exist"
-
-  # Step 5: Notification and summary
-  deployment-summary:
-    runs-on: ubuntu-latest
-    needs: [validate-templates, deploy-to-staging, test-workspaces, deploy-to-production]
-    if: always() && github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Generate deployment summary
-        run: |
-          echo "# 🚀 Template Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Validation | ${{ needs.validate-templates.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Staging Deploy | ${{ needs.deploy-to-staging.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Workspace Tests | ${{ needs.test-workspaces.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Production Deploy | ${{ needs.deploy-to-production.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [[ "${{ needs.deploy-to-production.result }}" == "success" ]]; then
-            echo "## 🎉 Production Templates Available:" >> $GITHUB_STEP_SUMMARY
-            echo "- \`business-demo-devcontainer\` - Modern Development Environment" >> $GITHUB_STEP_SUMMARY
-            echo "- \`business-demo-datascience\` - Data Science with Jupyter" >> $GITHUB_STEP_SUMMARY
-            echo "- \`business-demo-desktop\` - Full Desktop Environment" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "## ❌ Deployment failed. Check the logs above." >> $GITHUB_STEP_SUMMARY
-          fi
+      - name: Success ✅
+        run: echo "Template ${{ matrix.name }} deployed successfully!"
