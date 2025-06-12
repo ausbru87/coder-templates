@@ -1,119 +1,70 @@
-# .github/workflows/robust-deploy.yml
-name: Robust Template Deploy
+name: Test and Publish Coder Template
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  deploy-templates:
+  test-and-publish:
     runs-on: ubuntu-latest
     
     strategy:
       matrix:
         include:
-          - name: "business-demo-devcontainer"
-            path: "product-demo/devcontainer"
-            display: "DevContainer Demo"
           - name: "business-demo-datascience"
             path: "product-demo/data-science"
             display: "Data Science Demo"
-    
+          - name: "business-demo-kubernetes"
+            path: "product-demo/kubernetes"
+            display: "Kubernetes Demo"
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false  # Important: prevents wrapper issues
+      - name: change to template directory
+        run: cd ${{ matrix.path }}
 
-      - name: Setup Coder
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: latest
+
+      - name: Set up Coder CLI
         uses: coder/setup-action@v1
         with:
-          access_url: ${{ secrets.CODER_URL }}
+          access_url: "https://coder.cloud.zambruhni.com"
           coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
 
-      - name: Debug and Validate ${{ matrix.display }}
-        working-directory: ${{ matrix.path }}
-        run: |
-          echo "🔍 Debugging ${{ matrix.display }}..."
-          echo "📁 Current directory: $(pwd)"
-          echo "📋 Files:"
-          ls -la
-          echo "📄 Main.tf content (first 20 lines):"
-          head -20 main.tf
-          echo ""
-          echo "🔧 Initializing Terraform..."
-          terraform init -backend=false
-          echo "✅ Terraform initialized"
-          echo ""
-          echo "🔍 Validating..."
-          terraform validate
-          echo "✅ Validation passed"
+      - name: Validate Terraform template
+        run: terraform validate
 
-      - name: Deploy ${{ matrix.display }} (Create Method)
-        working-directory: ${{ matrix.path }}
-        run: |
-          echo "🚀 Deploying ${{ matrix.display }} using create method..."
-          echo "📁 Working from: $(pwd)"
-          echo "📋 Confirming files are here:"
-          ls -la *.tf
-          
-          # Use create method which is more reliable
-          coder templates create ${{ matrix.name }} \
-            --directory . \
-            --message "Demo template: ${{ matrix.display }} - GitHub Actions deploy" \
-            --yes || echo "Create failed, template might already exist"
-          
-          echo "✅ Template creation attempted"
+      - name: Get short commit SHA to use as template version name
+        id: name
+        run: echo "version_name=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Update ${{ matrix.display }} (Push Method)
-        working-directory: ${{ matrix.path }}
-        if: failure()  # Only run if create failed (template exists)
-        run: |
-          echo "📝 Template exists, updating with push method..."
-          coder templates push ${{ matrix.name }} \
-            --directory . \
-            --message "Updated demo template: ${{ matrix.display }}" \
-            --yes
-          
-          echo "✅ Template updated"
+      - name: Get latest commit title to use as template version description
+        id: message
+        run:
+          echo "pr_title=$(git log --format=%s -n 1 ${{ github.sha }})" >>
+          $GITHUB_OUTPUT
 
-      - name: Verify Template
+      - name: Push template to Coder
         run: |
-          echo "🔍 Verifying template deployment..."
-          coder templates list
-          echo ""
-          if coder templates list | grep -q "${{ matrix.name }}"; then
-            echo "✅ Template ${{ matrix.name }} found!"
-          else
-            echo "❌ Template ${{ matrix.name }} not found!"
-            exit 1
-          fi
+          coder templates push {{ matrix.name }} --activate=false --name ${{ steps.name.outputs.version_name }} --message "${{ steps.message.outputs.pr_title }}" --yes
 
-  summary:
-    runs-on: ubuntu-latest
-    needs: deploy-templates
-    if: always()
-    
-    steps:
-      - name: Deployment Summary
+      - name: Create a test workspace and run some example commands
         run: |
-          echo "# 🎯 Demo Template Deployment Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ${{ needs.deploy-templates.result == 'success' && '✅ SUCCESS' || '❌ FAILED' }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [[ "${{ needs.deploy-templates.result }}" == "success" ]]; then
-            echo "## 🚀 Ready for Demo!" >> $GITHUB_STEP_SUMMARY
-            echo "Your templates are deployed and ready:" >> $GITHUB_STEP_SUMMARY
-            echo "- \`business-demo-devcontainer\` - Modern Development" >> $GITHUB_STEP_SUMMARY
-            echo "- \`business-demo-datascience\` - Data Science Environment" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Time to impress that Fortune 500 CTO!** 🎪" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "## ❌ Deployment Issues" >> $GITHUB_STEP_SUMMARY
-            echo "Check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
-          fi
+          coder create -t {{ matrix.name }} --template-version ${{ steps.name.outputs.version_name }} test-${{ steps.name.outputs.version_name }} --yes
+          # run some example commands
+          coder ssh test-${{ steps.name.outputs.version_name }} -- make build
+
+      - name: Delete the test workspace
+        if: always()
+        run: coder delete test-${{ steps.name.outputs.version_name }} --yes
+
+      - name: Promote template version
+        if: success()
+        run: |
+          coder template version promote --template={{ matrix.name }} --template-version=${{ steps.name.outputs.version_name }} --yes
