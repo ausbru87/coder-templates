@@ -1,34 +1,59 @@
-# .github/workflows/simple-demo.yml
-name: Simple Template Deploy
+name: Test and Publish Coder Template
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  deploy-demo-templates:
+  test-and-publish:
     runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        include:
-          - name: "business-demo-devcontainer"
-            path: "product-demo/devcontainer"
-          - name: "business-demo-datascience"
-            path: "product-demo/data-science"
-    
+    env:
+      TEMPLATE_NAME: "my-template"
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Deploy ${{ matrix.name }}
-        uses: coder/deploy-coder-template@v1
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
         with:
-          name: ${{ matrix.name }}
-          directory: ${{ matrix.path }}
-          url: ${{ secrets.CODER_URL }}
-          token: ${{ secrets.CODER_SESSION_TOKEN }}
-          message: "Demo template deployed automatically"
-      
-      - name: Success ✅
-        run: echo "Template ${{ matrix.name }} deployed successfully!"
+          terraform_version: latest
+
+      - name: Set up Coder CLI
+        uses: coder/setup-action@v1
+        with:
+          access_url: "https://coder.cloud.zambruhni.com"
+          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
+
+      - name: Validate Terraform template
+        run: terraform validate
+
+      - name: Get short commit SHA to use as template version name
+        id: name
+        run: echo "version_name=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Get latest commit title to use as template version description
+        id: message
+        run:
+          echo "pr_title=$(git log --format=%s -n 1 ${{ github.sha }})" >>
+          $GITHUB_OUTPUT
+
+      - name: Push template to Coder
+        run: |
+          coder templates push $TEMPLATE_NAME --activate=false --name ${{ steps.name.outputs.version_name }} --message "${{ steps.message.outputs.pr_title }}" --yes
+
+      - name: Create a test workspace and run some example commands
+        run: |
+          coder create -t $TEMPLATE_NAME --template-version ${{ steps.name.outputs.version_name }} test-${{ steps.name.outputs.version_name }} --yes
+          # run some example commands
+          coder ssh test-${{ steps.name.outputs.version_name }} -- make build
+
+      - name: Delete the test workspace
+        if: always()
+        run: coder delete test-${{ steps.name.outputs.version_name }} --yes
+
+      - name: Promote template version
+        if: success()
+        run: |
+          coder template version promote --template=$TEMPLATE_NAME --template-version=${{ steps.name.outputs.version_name }} --yes
