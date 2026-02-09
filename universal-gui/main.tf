@@ -1,11 +1,13 @@
 # =============================================================================
 # Universal Kubernetes Development Template
 # =============================================================================
-# Full-featured Kubernetes-based workspace for general development.
+# Full-featured Kubernetes-based workspace with desktop GUI for general development.
 # Includes all IDEs, AI tools, and common development utilities.
 # Deployed to Kubernetes cluster in the coder-workspaces namespace.
 #
 # Features:
+# - Desktop GUI: XFCE desktop via KasmVNC (browser-accessible)
+# - Desktop Apps: Google Chrome, Terminator, VS Code Desktop
 # - IDEs: code-server (web), VS Code Desktop, Cursor
 # - AI Tools: Claude Code (configured via AI Bridge)
 # - Terminal: mux (tmux/screen multiplexer)
@@ -97,16 +99,16 @@ data "coder_parameter" "memory" {
   icon         = "/icon/memory.svg"
 
   option {
-    name  = "4 GB (Light)"
-    value = "4"
-  }
-  option {
     name  = "8 GB (Standard)"
     value = "8"
   }
   option {
     name  = "16 GB (Heavy)"
     value = "16"
+  }
+  option {
+    name  = "32 GB (Extreme)"
+    value = "32"
   }
 }
 
@@ -162,13 +164,32 @@ resource "coder_agent" "main" {
 
     echo "=== Universal Workspace Setup ==="
 
-    # Base packages
-    sudo apt-get update
-    sudo apt-get install -y \
-      git \
-      curl \
+    # Remove stale Yarn apt repo shipped in the enterprise-node image.
+    # Its GPG key (62D54FD4003F6525) is expired and breaks apt-get update.
+    # Yarn is available via corepack (ships with Node.js) — the repo is unnecessary.
+    sudo rm -f /etc/apt/sources.list.d/yarn.list 2>/dev/null || true
+
+    # Helper: run apt-get with automatic retry on dpkg lock conflict.
+    # Coder runs all coder_script resources in parallel, so the KasmVNC module
+    # may be holding the dpkg lock while installing its dependencies.
+    apt_get() {
+      local retries=0
+      while ! sudo apt-get "$@"; do
+        if [ $retries -ge 15 ]; then
+          echo "apt-get failed after $retries retries, giving up."
+          return 1
+        fi
+        echo "apt-get failed (likely dpkg lock), retrying in 5s... ($retries)"
+        retries=$((retries + 1))
+        sleep 5
+      done
+    }
+
+    # Base packages (packages already in enterprise-node are omitted:
+    # git, curl, jq, ca-certificates, sudo, iproute2, node, npm)
+    apt_get update
+    apt_get install -y \
       wget \
-      jq \
       vim \
       nano \
       htop \
@@ -177,14 +198,11 @@ resource "coder_agent" "main" {
       zip \
       gnupg \
       lsb-release \
-      ca-certificates \
       apt-transport-https \
-      software-properties-common \
       build-essential \
       make \
       cmake \
       pkg-config \
-      libssl-dev \
       openssh-client \
       rsync \
       fzf \
@@ -198,6 +216,32 @@ resource "coder_agent" "main" {
     sudo ln -sf /usr/bin/batcat /usr/local/bin/bat 2>/dev/null || true
 
     # -----------------------------
+    # Desktop Applications (available in XFCE via KasmVNC)
+    # -----------------------------
+
+    # Google Chrome
+    if ! command -v google-chrome &> /dev/null; then
+      echo "Installing Google Chrome..."
+      wget -q -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+      apt_get install -y /tmp/google-chrome.deb
+      rm -f /tmp/google-chrome.deb
+    fi
+
+    # Terminator (advanced terminal emulator)
+    if ! dpkg -s terminator &> /dev/null 2>&1; then
+      echo "Installing Terminator..."
+      apt_get install -y terminator
+    fi
+
+    # VS Code Desktop (runs inside the XFCE desktop session)
+    if ! command -v code &> /dev/null; then
+      echo "Installing VS Code Desktop..."
+      wget -q -O /tmp/vscode.deb "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64"
+      apt_get install -y /tmp/vscode.deb
+      rm -f /tmp/vscode.deb
+    fi
+
+    # -----------------------------
     # GitHub CLI
     # -----------------------------
     if ! command -v gh &> /dev/null; then
@@ -205,7 +249,7 @@ resource "coder_agent" "main" {
       curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
       echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
       sudo apt-get update
-      sudo apt-get install -y gh
+      apt_get install -y gh
     fi
 
     # -----------------------------
@@ -222,7 +266,7 @@ resource "coder_agent" "main" {
     # -----------------------------
     %{if data.coder_parameter.install_python.value == "true"}
     echo "Installing Python tools..."
-    sudo apt-get install -y python3 python3-pip python3-venv pipx
+    apt_get install -y python3 python3-pip python3-venv pipx
     # Use --break-system-packages since this is an isolated container (PEP 668)
     pip3 install --user --break-system-packages --upgrade pip
     pip3 install --user --break-system-packages poetry black ruff mypy pytest ipython
@@ -255,6 +299,9 @@ resource "coder_agent" "main" {
     %{if data.coder_parameter.install_rust.value == "true"}
     if ! command -v rustc &> /dev/null; then
       echo "Installing Rust..."
+      # libssl-dev is needed for crates that link against OpenSSL.
+      # Installed here (not globally) to avoid version conflicts with the desktop image.
+      apt_get install -y libssl-dev || true
       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
       source "$HOME/.cargo/env"
       rustup component add rust-analyzer clippy rustfmt
@@ -330,6 +377,12 @@ ROOCONFIG2
     %{if data.coder_parameter.install_rust.value == "true"}
     echo "  - rust: $(rustc --version 2>/dev/null || echo 'pending')"
     %{endif}
+    echo ""
+    echo "Desktop GUI:"
+    echo "  - XFCE Desktop: Available via KasmVNC in the Coder dashboard"
+    echo "  - Google Chrome: $(google-chrome --version 2>/dev/null || echo 'pending')"
+    echo "  - Terminator: $(terminator --version 2>/dev/null || echo 'pending')"
+    echo "  - VS Code Desktop: $(code --version 2>/dev/null | head -1 || echo 'pending')"
     echo ""
     echo "AI Tools configured:"
     echo "  - Claude Code: Available via 'claude' command"
@@ -487,6 +540,22 @@ module "aider" {
 }
 
 # -----------------------------------------------------------------------------
+# Desktop GUI
+# -----------------------------------------------------------------------------
+
+# KasmVNC - browser-accessible desktop (XFCE)
+# Requires a pre-installed desktop environment in the container image.
+# See https://registry.coder.com/modules/coder/kasmvnc
+module "kasmvnc" {
+  count               = data.coder_workspace.me.start_count
+  source              = "registry.coder.com/coder/kasmvnc/coder"
+  version             = "1.2.7"
+  agent_id            = coder_agent.main.id
+  desktop_environment = "xfce"
+  subdomain           = true # Enforce subdomain apps for security (XSS prevention)
+}
+
+# -----------------------------------------------------------------------------
 # Utility Modules
 # -----------------------------------------------------------------------------
 
@@ -573,7 +642,15 @@ resource "kubernetes_pod_v1" "workspace" {
       name              = "dev"
       image             = "codercom/enterprise-node:ubuntu"
       image_pull_policy = "Always"
-      command           = ["sh", "-c", coder_agent.main.init_script]
+      command = ["sh", "-c", <<-EOF
+        # Install desktop environment before starting the Coder agent.
+        # Must run before init_script so KasmVNC finds a working desktop.
+        sudo rm -f /etc/apt/sources.list.d/yarn.list 2>/dev/null || true
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends xfce4 dbus-x11
+        ${coder_agent.main.init_script}
+      EOF
+      ]
 
       security_context {
         run_as_user = 1000
