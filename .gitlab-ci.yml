@@ -1,0 +1,96 @@
+# =============================================================================
+# GitLab CI/CD Pipeline — Coder Template Verification & Push
+# =============================================================================
+# Validates Terraform templates on every push/MR. Pushes all templates to the
+# Coder deployment at dev.zambruhni.com on merge to main.
+#
+# Required CI/CD Variables (Settings → CI/CD → Variables):
+#   CODER_URL            — https://dev.zambruhni.com  (protected)
+#   CODER_SESSION_TOKEN  — long-lived token from gitlab-ci user (protected, masked)
+#
+# Optional CI/CD Variables:
+#   CUSTOM_CA_CERT       — PEM-encoded CA cert (type: File) for internal CAs
+# =============================================================================
+
+stages:
+  - validate
+  - deploy
+
+default:
+  image: hashicorp/terraform:latest
+  interruptible: true
+
+# Cache Terraform providers across pipelines
+cache:
+  key: terraform-providers-${CI_COMMIT_REF_SLUG}
+  paths:
+    - "**/.terraform/"
+
+# ---------------------------------------------------------------------------
+# Validate Stage — runs on every push and merge request
+# ---------------------------------------------------------------------------
+
+fmt-check:
+  stage: validate
+  script:
+    - terraform fmt -recursive -check
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+validate:
+  stage: validate
+  script:
+    - |
+      for dir in */; do
+        if [ -f "${dir}main.tf" ]; then
+          echo "==> Validating ${dir%/}"
+          cd "$dir"
+          terraform init -backend=false
+          terraform validate
+          cd "$CI_PROJECT_DIR"
+        fi
+      done
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+# ---------------------------------------------------------------------------
+# Deploy Stage — pushes templates to Coder on merge to main
+# ---------------------------------------------------------------------------
+
+push-templates:
+  stage: deploy
+  image: ghcr.io/coder/coder:latest
+  interruptible: false
+  cache: []
+  before_script:
+    # Trust custom CA if provided (for internal/gov PKI)
+    - |
+      if [ -n "${CUSTOM_CA_CERT:-}" ]; then
+        cat "$CUSTOM_CA_CERT" >> /etc/ssl/certs/ca-certificates.crt
+        export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+      fi
+  script:
+    - |
+      VERSION_NAME=$(git rev-parse --short HEAD)
+      COMMIT_MSG=$(git log --format=%s -n 1)
+
+      for dir in */; do
+        if [ -f "${dir}main.tf" ]; then
+          TEMPLATE_NAME="${dir%/}"
+          echo "==> Pushing template '${TEMPLATE_NAME}' (version: ${VERSION_NAME})"
+          /opt/coder templates push "$TEMPLATE_NAME" \
+            --directory "$dir" \
+            --name "$VERSION_NAME" \
+            --message "$COMMIT_MSG" \
+            --yes
+        fi
+      done
+  environment:
+    name: coder
+    url: $CODER_URL
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
