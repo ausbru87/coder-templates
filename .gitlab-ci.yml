@@ -151,6 +151,6 @@ push_templates:
           --directory "$TEMPLATE_DIR" \
           --name "$CI_COMMIT_SHORT_SHA" \
           --message "$CI_COMMIT_TITLE" \
-          --activate "$AUTO_ACTIVATE" \
+          --activate="$AUTO_ACTIVATE" \
           --yes
       done < changed_templates.txt
