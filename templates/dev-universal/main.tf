@@ -294,7 +294,7 @@ resource "coder_agent" "main" {
   "apiConfigs": {
     "AI Bridge (Anthropic)": {
       "apiProvider": "anthropic",
-      "anthropicBaseUrl": "https://dev.zambruhni.com/api/v2/aibridge/anthropic",
+      "anthropicBaseUrl": "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic",
       "anthropicApiKey": "$ANTHROPIC_API_KEY",
       "apiModelId": "claude-opus-4-5-20251101"
     }
@@ -311,7 +311,7 @@ ROOCONFIG
     "apiConfigs": {
       "AI Bridge (Anthropic)": {
         "apiProvider": "anthropic",
-        "anthropicBaseUrl": "https://dev.zambruhni.com/api/v2/aibridge/anthropic",
+        "anthropicBaseUrl": "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic",
         "anthropicApiKey": "$ANTHROPIC_API_KEY",
         "apiModelId": "claude-opus-4-5-20251101"
       }
@@ -331,6 +331,10 @@ ROOCONFIG2
       echo 'eval "$(starship init bash)"' >> ~/.bashrc
     fi
 
+
+    # Mux AI provider configuration
+    mkdir -p ~/.mux
+    echo '${replace(jsonencode(local.mux_provider_settings), "'", "'\\''")}' > ~/.mux/providers.jsonc
     echo "=== Universal Workspace Ready ==="
     echo ""
     echo "Installed tools:"
@@ -363,11 +367,13 @@ ROOCONFIG2
   # AI Bridge environment variables - routes AI requests through Coder's AI Bridge
   env = {
     # Anthropic API access via AI Bridge
-    ANTHROPIC_BASE_URL = "https://dev.zambruhni.com/api/v2/aibridge/anthropic"
+    ANTHROPIC_BASE_URL = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
     # OpenAI API access via AI Bridge
-    OPENAI_BASE_URL = "https://dev.zambruhni.com/api/v2/aibridge/openai"
+    OPENAI_BASE_URL = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
+    ANTHROPIC_MODEL              = "anthropic.claude-opus-4-5-20251101-v1:0"
+    ANTHROPIC_SMALL_FAST_MODEL   = "anthropic.claude-haiku-4-5-20251001-v1:0"
     # Aider/LiteLLM uses ANTHROPIC_API_BASE instead of ANTHROPIC_BASE_URL
-    ANTHROPIC_API_BASE = "https://dev.zambruhni.com/api/v2/aibridge/anthropic"
+    ANTHROPIC_API_BASE = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
     # GitHub token for git operations (set via external auth if configured)
     # GITHUB_TOKEN = data.coder_external_auth.github.access_token
     # Editor configuration
@@ -406,6 +412,40 @@ ROOCONFIG2
     script       = "cd /home/coder && git branch --show-current 2>/dev/null || echo 'N/A'"
     interval     = 30
     timeout      = 1
+  }
+}
+
+locals {
+  claude_settings = {
+    env = {
+      ANTHROPIC_BASE_URL   = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
+      ANTHROPIC_AUTH_TOKEN  = data.coder_workspace_owner.me.session_token
+      OPENAI_BASE_URL      = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
+      ANTHROPIC_MODEL              = "anthropic.claude-opus-4-5-20251101-v1:0"
+      ANTHROPIC_SMALL_FAST_MODEL   = "anthropic.claude-haiku-4-5-20251001-v1:0"
+      GH_TOKEN             = data.coder_external_auth.github.access_token
+      GH_USERNAME          = data.coder_workspace_owner.me.name
+      GIT_AUTHOR_NAME      = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+      GIT_AUTHOR_EMAIL     = data.coder_workspace_owner.me.email
+      GIT_COMMITTER_NAME   = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+      GIT_COMMITTER_EMAIL  = data.coder_workspace_owner.me.email
+    }
+    autoUpdaterStatus             = "disabled"
+    hasAcknowledgedCostThreshold  = true
+    hasCompletedOnboarding        = true
+    bypassPermissionsModeAccepted = true
+  }
+
+  mux_provider_settings = {
+    "anthropic" = {
+      "serviceTier" = "default"
+      "models" = [
+        "anthropic.claude-haiku-4-5-20251001-v1:0",
+        "anthropic.claude-opus-4-5-20251101-v1:0"
+      ]
+      "baseUrl" = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
+      "apiKey"  = data.coder_workspace_owner.me.session_token
+    }
   }
 }
 
@@ -487,12 +527,30 @@ module "mux" {
 # Claude Code - AI coding assistant
 # Automatically configured to use AI Bridge via ANTHROPIC_BASE_URL env var
 module "claude-code" {
-  count     = data.coder_workspace.me.start_count
-  source    = "registry.coder.com/coder/claude-code/coder"
-  version   = "4.4.2"
-  agent_id  = coder_agent.main.id
-  workdir   = "/home/coder"
-  subdomain = true # Enforce subdomain apps for security (XSS prevention)
+  count               = data.coder_workspace.me.start_count
+  source              = "registry.coder.com/coder/claude-code/coder"
+  version             = "4.4.2"
+  agent_id            = coder_agent.main.id
+  workdir             = "/home/coder"
+  subdomain           = true
+  report_tasks        = true
+  install_agentapi    = true
+  install_claude_code = true
+  post_install_script = templatefile("scripts/claude/install.sh", {
+    HOME_FOLDER = "/home/coder"
+    SETTINGS    = jsonencode(local.claude_settings)
+  })
+}
+
+resource "coder_ai_task" "this" {
+  app_id = try(module.claude-code[0].task_app_id, "00000000-0000-0000-0000-000000000000")
+}
+
+module "coder-login" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/coder-login/coder"
+  version  = "1.0.15"
+  agent_id = coder_agent.main.id
 }
 
 # Aider - AI pair programming in your terminal
@@ -506,6 +564,15 @@ module "aider" {
   ai_provider = "anthropic"
   model       = "claude-opus-4-5-20251101"
   subdomain   = true # Enforce subdomain apps for security (XSS prevention)
+}
+
+# Codex - OpenAI coding agent
+module "codex" {
+  count     = data.coder_workspace.me.start_count
+  source    = "registry.coder.com/coder-labs/codex/coder"
+  agent_id  = coder_agent.main.id
+  workdir   = "/home/coder"
+  subdomain = true
 }
 
 # -----------------------------------------------------------------------------
