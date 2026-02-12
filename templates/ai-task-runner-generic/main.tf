@@ -120,10 +120,8 @@ locals {
     env = {
       ANTHROPIC_BASE_URL   = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
       ANTHROPIC_AUTH_TOKEN = data.coder_workspace_owner.me.session_token
-      OPENAI_BASE_URL              = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
-      ANTHROPIC_MODEL              = "anthropic.claude-opus-4-5-20251101-v1:0"
-      ANTHROPIC_SMALL_FAST_MODEL   = "anthropic.claude-haiku-4-5-20251001-v1:0"
-      PREVIEW_PORT                 = tostring(local.preview_port)
+      OPENAI_BASE_URL      = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
+      PREVIEW_PORT         = tostring(local.preview_port)
       GH_TOKEN             = data.coder_external_auth.github.access_token
       GH_USERNAME          = data.coder_workspace_owner.me.name
       GIT_AUTHOR_NAME      = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
@@ -135,18 +133,6 @@ locals {
     hasAcknowledgedCostThreshold  = true
     hasCompletedOnboarding        = true
     bypassPermissionsModeAccepted = true
-  }
-
-  mux_provider_settings = {
-    "anthropic" = {
-      "serviceTier" = "default"
-      "models" = [
-        "anthropic.claude-haiku-4-5-20251001-v1:0",
-        "anthropic.claude-opus-4-5-20251101-v1:0"
-      ]
-      "baseUrl" = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
-      "apiKey"  = data.coder_workspace_owner.me.session_token
-    }
   }
 }
 
@@ -168,11 +154,6 @@ resource "coder_agent" "main" {
       ripgrep
 
     mkdir -p /home/coder/repo
-
-    # Mux AI provider configuration
-    mkdir -p ~/.mux
-    echo '${replace(jsonencode(local.mux_provider_settings), "'", "'\\''")}' > ~/.mux/providers.jsonc
-
     echo "ai-task-runner-generic workspace ready"
   EOT
 
@@ -186,9 +167,7 @@ resource "coder_agent" "main" {
     ANTHROPIC_BASE_URL   = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
     ANTHROPIC_API_BASE   = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
     OPENAI_BASE_URL      = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
-    ANTHROPIC_AUTH_TOKEN          = data.coder_workspace_owner.me.session_token
-    ANTHROPIC_MODEL              = "anthropic.claude-opus-4-5-20251101-v1:0"
-    ANTHROPIC_SMALL_FAST_MODEL   = "anthropic.claude-haiku-4-5-20251001-v1:0"
+    ANTHROPIC_AUTH_TOKEN = data.coder_workspace_owner.me.session_token
   }
 
   metadata {
@@ -248,13 +227,6 @@ module "claude-code" {
 
 resource "coder_ai_task" "this" {
   app_id = try(module.claude-code[0].task_app_id, "00000000-0000-0000-0000-000000000000")
-}
-
-module "coder-login" {
-  count    = data.coder_workspace.me.start_count
-  source   = "registry.coder.com/coder/coder-login/coder"
-  version  = "1.0.15"
-  agent_id = coder_agent.main.id
 }
 
 module "mux" {
