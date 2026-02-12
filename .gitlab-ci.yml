@@ -122,8 +122,9 @@ push_templates:
   stage: push
   image: ghcr.io/coder/coder:latest
   needs:
-    - job: validate_templates
+    - job: discover_templates
       artifacts: true
+    - job: validate_templates
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
