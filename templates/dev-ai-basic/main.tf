@@ -31,6 +31,16 @@ data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
+data "coder_external_auth" "github" {
+  id       = "github"
+  optional = true
+}
+
+data "coder_external_auth" "gitlab" {
+  id       = "gitlab"
+  optional = true
+}
+
 data "coder_parameter" "dotfiles_url" {
   name         = "dotfiles_url"
   display_name = "Dotfiles URL"
@@ -56,14 +66,9 @@ data "coder_parameter" "memory" {
   display_name = "Memory (GB)"
   description  = "Memory allocation for the workspace pod"
   type         = "number"
-  default      = 6
+  default      = 8
   mutable      = true
   icon         = "/icon/memory.svg"
-
-  option {
-    name  = "4 GB"
-    value = 4
-  }
 
   option {
     name  = "6 GB"
@@ -79,6 +84,33 @@ data "coder_parameter" "memory" {
     name  = "12 GB"
     value = 12
   }
+
+  option {
+    name  = "16 GB"
+    value = 16
+  }
+}
+
+data "coder_parameter" "enable_roo" {
+  name         = "enable_roo"
+  display_name = "Enable Roo Code setup"
+  description  = "Preconfigure Roo Code to use AI Bridge settings"
+  type         = "bool"
+  default      = true
+  mutable      = true
+  icon         = "/icon/code.svg"
+}
+
+locals {
+  enable_roo = tobool(data.coder_parameter.enable_roo.value)
+
+  code_server_extensions = local.enable_roo ? [
+    "RooVeterinaryInc.roo-cline"
+  ] : []
+
+  code_server_machine_settings = local.enable_roo ? {
+    "roo-cline.autoImportSettingsPath" = "/home/coder/.config/roo-code/ai-bridge-settings.json"
+  } : {}
 }
 
 resource "coder_agent" "main" {
@@ -100,10 +132,63 @@ resource "coder_agent" "main" {
       ca-certificates \
       openssh-client \
       ripgrep \
-      fd-find
+      fd-find \
+      python3 \
+      python3-pip
 
     sudo ln -sf /usr/bin/fdfind /usr/local/bin/fd 2>/dev/null || true
-    echo "tier-dev-basic workspace ready"
+
+    if ! command -v gh >/dev/null 2>&1; then
+      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+      sudo apt-get update
+      sudo apt-get install -y gh
+    fi
+
+    if ! command -v glab >/dev/null 2>&1; then
+      curl -fsSL https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh | sudo bash || true
+      sudo apt-get install -y glab || true
+    fi
+
+    # Best-effort Codex CLI install fallback in case module registry is unavailable.
+    if ! command -v codex >/dev/null 2>&1; then
+      sudo npm install -g @openai/codex || true
+    fi
+
+    if ${local.enable_roo}; then
+      ROOCODE_STORAGE="/home/coder/.local/share/code-server/User/globalStorage/rooveterinaryinc.roo-cline"
+      mkdir -p "$ROOCODE_STORAGE/settings"
+      cat > "$ROOCODE_STORAGE/settings/provider_profiles.json" << ROOCONFIG
+{
+  "currentApiConfigName": "AI Bridge (Anthropic)",
+  "apiConfigs": {
+    "AI Bridge (Anthropic)": {
+      "apiProvider": "anthropic",
+      "anthropicBaseUrl": "https://dev.zambruhni.com/api/v2/aibridge/anthropic",
+      "anthropicApiKey": "$ANTHROPIC_API_KEY"
+    }
+  }
+}
+ROOCONFIG
+
+      mkdir -p /home/coder/.config/roo-code
+      cat > /home/coder/.config/roo-code/ai-bridge-settings.json << ROOCONFIG2
+{
+  "providerProfiles": {
+    "currentApiConfigName": "AI Bridge (Anthropic)",
+    "apiConfigs": {
+      "AI Bridge (Anthropic)": {
+        "apiProvider": "anthropic",
+        "anthropicBaseUrl": "https://dev.zambruhni.com/api/v2/aibridge/anthropic",
+        "anthropicApiKey": "$ANTHROPIC_API_KEY"
+      }
+    }
+  }
+}
+ROOCONFIG2
+    fi
+
+    echo "dev-ai-basic workspace ready"
   EOT
 
   env = {
@@ -111,6 +196,9 @@ resource "coder_agent" "main" {
     GIT_AUTHOR_EMAIL    = data.coder_workspace_owner.me.email
     GIT_COMMITTER_NAME  = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
     GIT_COMMITTER_EMAIL = data.coder_workspace_owner.me.email
+    ANTHROPIC_BASE_URL  = "https://dev.zambruhni.com/api/v2/aibridge/anthropic"
+    ANTHROPIC_API_BASE  = "https://dev.zambruhni.com/api/v2/aibridge/anthropic"
+    OPENAI_BASE_URL     = "https://dev.zambruhni.com/api/v2/aibridge/openai"
     EDITOR              = "code"
     VISUAL              = "code"
   }
@@ -140,12 +228,51 @@ resource "coder_agent" "main" {
   }
 }
 
+resource "coder_env" "anthropic_api_key" {
+  agent_id = coder_agent.main.id
+  name     = "ANTHROPIC_API_KEY"
+  value    = data.coder_workspace_owner.me.session_token
+}
+
+resource "coder_env" "openai_api_key" {
+  agent_id = coder_agent.main.id
+  name     = "OPENAI_API_KEY"
+  value    = data.coder_workspace_owner.me.session_token
+}
+
 module "code-server" {
+  count            = data.coder_workspace.me.start_count
+  source           = "registry.coder.com/coder/code-server/coder"
+  version          = "1.3.1"
+  agent_id         = coder_agent.main.id
+  folder           = "/home/coder"
+  subdomain        = true
+  extensions       = local.code_server_extensions
+  machine-settings = local.code_server_machine_settings
+}
+
+module "mux" {
   count     = data.coder_workspace.me.start_count
-  source    = "registry.coder.com/coder/code-server/coder"
-  version   = "1.3.1"
+  source    = "registry.coder.com/coder/mux/coder"
+  version   = "1.0.7"
   agent_id  = coder_agent.main.id
-  folder    = "/home/coder"
+  subdomain = true
+}
+
+module "claude-code" {
+  count     = data.coder_workspace.me.start_count
+  source    = "registry.coder.com/coder/claude-code/coder"
+  version   = "4.4.2"
+  agent_id  = coder_agent.main.id
+  workdir   = "/home/coder"
+  subdomain = true
+}
+
+module "codex" {
+  count     = data.coder_workspace.me.start_count
+  source    = "registry.coder.com/coder-labs/codex/coder"
+  agent_id  = coder_agent.main.id
+  workdir   = "/home/coder"
   subdomain = true
 }
 
@@ -172,7 +299,7 @@ resource "kubernetes_persistent_volume_claim_v1" "home" {
     namespace = var.namespace
     labels = {
       "app.kubernetes.io/name"   = "coder-workspace"
-      "workspace.coder.com/type" = "tier-dev-basic"
+      "workspace.coder.com/type" = "dev-ai-basic"
     }
   }
 
@@ -200,7 +327,7 @@ resource "kubernetes_pod_v1" "workspace" {
     namespace = var.namespace
     labels = {
       "app.kubernetes.io/name"   = "coder-workspace"
-      "workspace.coder.com/type" = "tier-dev-basic"
+      "workspace.coder.com/type" = "dev-ai-basic"
     }
   }
 
@@ -212,7 +339,7 @@ resource "kubernetes_pod_v1" "workspace" {
 
     container {
       name              = "dev"
-      image             = "codercom/enterprise-base:ubuntu"
+      image             = "codercom/enterprise-node:ubuntu"
       image_pull_policy = "Always"
       command           = ["sh", "-c", coder_agent.main.init_script]
 

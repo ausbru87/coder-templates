@@ -4,11 +4,11 @@ This repository is the canonical source for templates pushed to `https://dev.zam
 
 ## Template Catalog
 
-- `tier-ai-task-runner-generic`: task-driven AI runner workspace with `coder_ai_task` and Claude Code.
-- `tier-dev-basic`: minimal code-server + terminal workspace.
-- `tier-dev-ai-basic`: minimal dev workspace plus AI Bridge, mux, Claude Code, and Codex integration.
-- `tier-dev-universal`: general development workspace (Python, Node/JS/TS, Java, optional Go/Rust).
-- `tier-dso-universal`: DevSecOps/SRE workspace (Terraform, cloud CLIs, Kubernetes tools, security tooling) with AI modules.
+- `ai-task-runner-generic`: task-driven AI runner workspace with `coder_ai_task` and Claude Code.
+- `dev-basic`: minimal code-server + terminal workspace.
+- `dev-ai-basic`: minimal dev workspace plus AI Bridge, mux, Claude Code, and Codex integration.
+- `dev-universal`: general development workspace (Python, Node/JS/TS, Java, optional Go/Rust).
+- `dso-universal`: DevSecOps/SRE workspace (Terraform, cloud CLIs, Kubernetes tools, security tooling) with AI modules.
 
 Existing templates remain available during migration:
 
@@ -19,11 +19,11 @@ Existing templates remain available during migration:
 
 ```text
 templates/
-  tier-ai-task-runner-generic/
-  tier-dev-basic/
-  tier-dev-ai-basic/
-  tier-dev-universal/
-  tier-dso-universal/
+  ai-task-runner-generic/
+  dev-basic/
+  dev-ai-basic/
+  dev-universal/
+  dso-universal/
 ci/
   discover_templates.py
 .gitlab-ci.yml

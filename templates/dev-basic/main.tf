@@ -31,9 +31,24 @@ data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
-data "coder_external_auth" "github" {
-  id       = "github"
-  optional = true
+data "coder_parameter" "dotfiles_url" {
+  name         = "dotfiles_url"
+  display_name = "Dotfiles URL"
+  description  = "Git repository URL for your dotfiles (optional)."
+  type         = "string"
+  default      = ""
+  mutable      = true
+  icon         = "/icon/dotfiles.svg"
+}
+
+data "coder_parameter" "git_repo" {
+  name         = "git_repo"
+  display_name = "Git Repository"
+  description  = "Repository to clone on workspace start (optional)."
+  type         = "string"
+  default      = ""
+  mutable      = true
+  icon         = "/icon/git.svg"
 }
 
 data "coder_parameter" "memory" {
@@ -41,9 +56,14 @@ data "coder_parameter" "memory" {
   display_name = "Memory (GB)"
   description  = "Memory allocation for the workspace pod"
   type         = "number"
-  default      = 8
+  default      = 6
   mutable      = true
   icon         = "/icon/memory.svg"
+
+  option {
+    name  = "4 GB"
+    value = 4
+  }
 
   option {
     name  = "6 GB"
@@ -59,58 +79,6 @@ data "coder_parameter" "memory" {
     name  = "12 GB"
     value = 12
   }
-
-  option {
-    name  = "16 GB"
-    value = 16
-  }
-}
-
-data "coder_parameter" "ai_prompt" {
-  type         = "string"
-  name         = "ai_prompt"
-  display_name = "AI Task Prompt"
-  description  = "The first task prompt for Claude Code"
-  mutable      = true
-  form_type    = "textarea"
-  default      = "You are in /home/coder/repo. Analyze the project and propose actionable next steps."
-  icon         = "/icon/terminal.svg"
-}
-
-data "coder_parameter" "system_prompt" {
-  type         = "string"
-  name         = "system_prompt"
-  display_name = "AI System Prompt"
-  description  = "Optional system-level constraints and context"
-  mutable      = true
-  form_type    = "textarea"
-  default      = "You are a careful coding assistant. Make small, verifiable changes and explain tradeoffs."
-  icon         = "/icon/terminal.svg"
-}
-
-data "coder_parameter" "enable_preview_app" {
-  name         = "enable_preview_app"
-  display_name = "Enable Preview App"
-  description  = "Expose localhost preview app"
-  type         = "bool"
-  default      = false
-  mutable      = true
-  icon         = "/icon/code.svg"
-}
-
-data "coder_parameter" "preview_port" {
-  count        = tobool(data.coder_parameter.enable_preview_app.value) ? 1 : 0
-  name         = "preview_port"
-  display_name = "Preview Port"
-  description  = "Preview app port"
-  type         = "number"
-  default      = 3000
-  mutable      = true
-  icon         = "/icon/code.svg"
-}
-
-locals {
-  preview_port = try(data.coder_parameter.preview_port[0].value, 3000)
 }
 
 resource "coder_agent" "main" {
@@ -126,24 +94,25 @@ resource "coder_agent" "main" {
       git \
       jq \
       vim \
+      htop \
+      unzip \
+      zip \
       ca-certificates \
       openssh-client \
-      ripgrep
+      ripgrep \
+      fd-find
 
-    mkdir -p /home/coder/repo
-    echo "tier-ai-task-runner-generic workspace ready"
+    sudo ln -sf /usr/bin/fdfind /usr/local/bin/fd 2>/dev/null || true
+    echo "dev-basic workspace ready"
   EOT
 
   env = {
-    PREVIEW_PORT        = tostring(local.preview_port)
     GIT_AUTHOR_NAME     = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
     GIT_AUTHOR_EMAIL    = data.coder_workspace_owner.me.email
     GIT_COMMITTER_NAME  = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
     GIT_COMMITTER_EMAIL = data.coder_workspace_owner.me.email
-    GH_TOKEN            = data.coder_external_auth.github.access_token
-    ANTHROPIC_BASE_URL  = "https://dev.zambruhni.com/api/v2/aibridge/anthropic"
-    ANTHROPIC_API_BASE  = "https://dev.zambruhni.com/api/v2/aibridge/anthropic"
-    OPENAI_BASE_URL     = "https://dev.zambruhni.com/api/v2/aibridge/openai"
+    EDITOR              = "code"
+    VISUAL              = "code"
   }
 
   metadata {
@@ -171,61 +140,30 @@ resource "coder_agent" "main" {
   }
 }
 
-resource "coder_env" "anthropic_api_key" {
-  agent_id = coder_agent.main.id
-  name     = "ANTHROPIC_API_KEY"
-  value    = data.coder_workspace_owner.me.session_token
-}
-
-resource "coder_env" "openai_api_key" {
-  agent_id = coder_agent.main.id
-  name     = "OPENAI_API_KEY"
-  value    = data.coder_workspace_owner.me.session_token
-}
-
-module "claude-code" {
-  count         = data.coder_workspace.me.start_count
-  source        = "registry.coder.com/coder/claude-code/coder"
-  version       = "4.4.2"
-  agent_id      = coder_agent.main.id
-  workdir       = "/home/coder/repo"
-  subdomain     = true
-  report_tasks  = true
-  system_prompt = data.coder_parameter.system_prompt.value
-  ai_prompt     = data.coder_parameter.ai_prompt.value
-}
-
-resource "coder_ai_task" "this" {
-  app_id = try(module.claude-code[0].task_app_id, "00000000-0000-0000-0000-000000000000")
-}
-
-module "mux" {
-  count     = data.coder_workspace.me.start_count
-  source    = "registry.coder.com/coder/mux/coder"
-  version   = "1.0.7"
-  agent_id  = coder_agent.main.id
-  subdomain = true
-}
-
 module "code-server" {
   count     = data.coder_workspace.me.start_count
   source    = "registry.coder.com/coder/code-server/coder"
   version   = "1.3.1"
   agent_id  = coder_agent.main.id
-  folder    = "/home/coder/repo"
+  folder    = "/home/coder"
   subdomain = true
 }
 
-resource "coder_app" "preview" {
-  count        = tobool(data.coder_parameter.enable_preview_app.value) ? 1 : 0
+module "dotfiles" {
+  count        = data.coder_parameter.dotfiles_url.value != "" ? data.coder_workspace.me.start_count : 0
+  source       = "registry.coder.com/coder/dotfiles/coder"
+  version      = "1.0.23"
   agent_id     = coder_agent.main.id
-  slug         = "preview"
-  display_name = "Preview"
-  icon         = "/icon/code.svg"
-  url          = "http://localhost:${local.preview_port}"
-  share        = "owner"
-  subdomain    = true
-  open_in      = "tab"
+  dotfiles_uri = data.coder_parameter.dotfiles_url.value
+}
+
+module "git-clone" {
+  count    = data.coder_parameter.git_repo.value != "" ? data.coder_workspace.me.start_count : 0
+  source   = "registry.coder.com/coder/git-clone/coder"
+  version  = "1.0.22"
+  agent_id = coder_agent.main.id
+  url      = data.coder_parameter.git_repo.value
+  base_dir = "/home/coder"
 }
 
 resource "kubernetes_persistent_volume_claim_v1" "home" {
@@ -234,7 +172,7 @@ resource "kubernetes_persistent_volume_claim_v1" "home" {
     namespace = var.namespace
     labels = {
       "app.kubernetes.io/name"   = "coder-workspace"
-      "workspace.coder.com/type" = "tier-ai-task-runner-generic"
+      "workspace.coder.com/type" = "dev-basic"
     }
   }
 
@@ -262,7 +200,7 @@ resource "kubernetes_pod_v1" "workspace" {
     namespace = var.namespace
     labels = {
       "app.kubernetes.io/name"   = "coder-workspace"
-      "workspace.coder.com/type" = "tier-ai-task-runner-generic"
+      "workspace.coder.com/type" = "dev-basic"
     }
   }
 

@@ -175,7 +175,7 @@ resource "coder_agent" "main" {
       sudo npm install -g @openai/codex || true
     fi
 
-    echo "tier-dso-universal workspace ready"
+    echo "dso-universal workspace ready"
   EOT
 
   env = {
@@ -305,7 +305,7 @@ resource "kubernetes_persistent_volume_claim_v1" "home" {
     namespace = var.namespace
     labels = {
       "app.kubernetes.io/name"   = "coder-workspace"
-      "workspace.coder.com/type" = "tier-dso-universal"
+      "workspace.coder.com/type" = "dso-universal"
     }
   }
 
@@ -333,7 +333,7 @@ resource "kubernetes_pod_v1" "workspace" {
     namespace = var.namespace
     labels = {
       "app.kubernetes.io/name"   = "coder-workspace"
-      "workspace.coder.com/type" = "tier-dso-universal"
+      "workspace.coder.com/type" = "dso-universal"
     }
   }
 

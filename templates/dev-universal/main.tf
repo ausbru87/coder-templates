@@ -553,7 +553,7 @@ resource "kubernetes_persistent_volume_claim_v1" "home" {
       "app.kubernetes.io/name"     = "coder-workspace"
       "app.kubernetes.io/instance" = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
       "app.kubernetes.io/part-of"  = "coder"
-      "workspace.coder.com/type"   = "tier-dev-universal"
+      "workspace.coder.com/type"   = "dev-universal"
     }
   }
   wait_until_bound = false
@@ -581,7 +581,7 @@ resource "kubernetes_pod_v1" "workspace" {
       "app.kubernetes.io/name"     = "coder-workspace"
       "app.kubernetes.io/instance" = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
       "app.kubernetes.io/part-of"  = "coder"
-      "workspace.coder.com/type"   = "tier-dev-universal"
+      "workspace.coder.com/type"   = "dev-universal"
     }
   }
 
