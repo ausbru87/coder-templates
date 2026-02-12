@@ -9,6 +9,7 @@ variables:
   AUTO_ACTIVATE: "false"
   CODER_ORG: "default"
   TF_PLAN_CHECK_STRICT: "false"
+  PUSH_ALL: "false"
 
 discover_templates:
   stage: discover
@@ -29,11 +30,15 @@ discover_templates:
         BASE_SHA="$(git rev-parse HEAD~1)"
       fi
       HEAD_SHA="$CI_COMMIT_SHA"
-      echo "Using diff range: ${BASE_SHA}...${HEAD_SHA}"
-
-      git --no-pager diff --name-only "${BASE_SHA}...${HEAD_SHA}" \
-        | awk -F/ '$1 == "templates" && $2 != "" { print $1 "/" $2 }' \
-        | sort -u > changed_templates.txt
+      if [ "$PUSH_ALL" = "true" ]; then
+        echo "PUSH_ALL=true set; discovering all templates."
+        find templates -mindepth 1 -maxdepth 1 -type d | sort > changed_templates.txt
+      else
+        echo "Using diff range: ${BASE_SHA}...${HEAD_SHA}"
+        git --no-pager diff --name-only "${BASE_SHA}...${HEAD_SHA}" \
+          | awk -F/ '$1 == "templates" && $2 != "" { print $1 "/" $2 }' \
+          | sort -u > changed_templates.txt
+      fi
 
       if [ -s changed_templates.txt ]; then
         printf '{"include":[' > matrix.json
