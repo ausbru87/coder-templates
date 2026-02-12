@@ -1,0 +1,135 @@
+stages:
+  - discover
+  - validate
+  - push
+
+variables:
+  TF_INPUT: "0"
+  TF_IN_AUTOMATION: "1"
+  AUTO_ACTIVATE: "false"
+  CODER_ORG: "default"
+  TF_PLAN_CHECK_STRICT: "false"
+
+discover_templates:
+  stage: discover
+  image: alpine:3.20
+  rules:
+    - changes:
+        - templates/**/*
+        - ci/discover_templates.py
+        - .gitlab-ci.yml
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  before_script:
+    - apk add --no-cache git python3
+  script:
+    - |
+      if [ -n "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then
+        BASE_SHA="$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+      elif [ -n "$CI_COMMIT_BEFORE_SHA" ] && [ "$CI_COMMIT_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+        BASE_SHA="$CI_COMMIT_BEFORE_SHA"
+      else
+        BASE_SHA="$(git rev-parse HEAD~1)"
+      fi
+      HEAD_SHA="$CI_COMMIT_SHA"
+      echo "Using diff range: ${BASE_SHA}...${HEAD_SHA}"
+      python3 ci/discover_templates.py \
+        --deployment-dir templates \
+        --base "$BASE_SHA" \
+        --head "$HEAD_SHA" \
+        --json-output matrix.json \
+        --text-output changed_templates.txt
+      if [ ! -s changed_templates.txt ]; then
+        echo "No template changes detected under templates/."
+      else
+        echo "Changed templates:"
+        cat changed_templates.txt
+      fi
+  artifacts:
+    when: always
+    paths:
+      - matrix.json
+      - changed_templates.txt
+    expire_in: 1 day
+
+validate_templates:
+  stage: validate
+  image: hashicorp/terraform:1.11
+  needs:
+    - job: discover_templates
+      artifacts: true
+  rules:
+    - changes:
+        - templates/**/*
+        - ci/discover_templates.py
+        - .gitlab-ci.yml
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  script:
+    - |
+      if [ ! -s changed_templates.txt ]; then
+        echo "No changed templates to validate."
+        exit 0
+      fi
+      while IFS= read -r TEMPLATE_DIR; do
+        [ -z "$TEMPLATE_DIR" ] && continue
+        echo "Validating $TEMPLATE_DIR"
+        (
+          cd "$TEMPLATE_DIR"
+          terraform fmt -check
+          terraform init -backend=false
+          terraform validate
+          set +e
+          terraform plan -refresh=false -lock=false -input=false -no-color > /tmp/tf-plan.txt 2>&1
+          PLAN_RC=$?
+          set -e
+          if [ "$PLAN_RC" -ne 0 ] && [ "$PLAN_RC" -ne 2 ]; then
+            echo "terraform plan check failed for $TEMPLATE_DIR"
+            if grep -Eiq "Failed to configure Coder client|Kubernetes cluster unreachable|invalid configuration|no configuration has been provided|connection refused|Failed to load Kubernetes config" /tmp/tf-plan.txt; then
+              cat /tmp/tf-plan.txt
+              if [ "$TF_PLAN_CHECK_STRICT" = "true" ]; then
+                echo "Plan check is strict; failing due to provider connectivity/auth config."
+                exit 1
+              fi
+              echo "Plan check hit provider connectivity/auth limits in CI. Set TF_PLAN_CHECK_STRICT=true to enforce hard fail."
+            else
+              cat /tmp/tf-plan.txt
+              exit 1
+            fi
+          fi
+        )
+      done < changed_templates.txt
+
+push_templates:
+  stage: push
+  image: ghcr.io/coder/coder:latest
+  needs:
+    - job: validate_templates
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - templates/**/*
+        - ci/discover_templates.py
+        - .gitlab-ci.yml
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "main"'
+  script:
+    - |
+      if [ -z "$CODER_URL" ] || [ -z "$CODER_SESSION_TOKEN" ]; then
+        echo "CODER_URL and CODER_SESSION_TOKEN are required to push templates."
+        exit 1
+      fi
+      if [ ! -s changed_templates.txt ]; then
+        echo "No changed templates to push."
+        exit 0
+      fi
+      while IFS= read -r TEMPLATE_DIR; do
+        [ -z "$TEMPLATE_DIR" ] && continue
+        TEMPLATE_NAME="$(basename "$TEMPLATE_DIR")"
+        echo "Pushing template $TEMPLATE_NAME from $TEMPLATE_DIR"
+        coder templates push "$TEMPLATE_NAME" \
+          --org "$CODER_ORG" \
+          --directory "$TEMPLATE_DIR" \
+          --name "$CI_COMMIT_SHORT_SHA" \
+          --message "$CI_COMMIT_TITLE" \
+          --activate "$AUTO_ACTIVATE" \
+          --yes
+      done < changed_templates.txt
