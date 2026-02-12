@@ -12,15 +12,13 @@ variables:
 
 discover_templates:
   stage: discover
-  image: alpine:3.20
+  image: alpine/git:2.47.2
   rules:
     - changes:
         - templates/**/*
         - ci/discover_templates.py
         - .gitlab-ci.yml
     - if: '$CI_PIPELINE_SOURCE == "web"'
-  before_script:
-    - apk add --no-cache git python3
   script:
     - |
       if [ -n "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then
@@ -32,12 +30,29 @@ discover_templates:
       fi
       HEAD_SHA="$CI_COMMIT_SHA"
       echo "Using diff range: ${BASE_SHA}...${HEAD_SHA}"
-      python3 ci/discover_templates.py \
-        --deployment-dir templates \
-        --base "$BASE_SHA" \
-        --head "$HEAD_SHA" \
-        --json-output matrix.json \
-        --text-output changed_templates.txt
+
+      git --no-pager diff --name-only "${BASE_SHA}...${HEAD_SHA}" \
+        | awk -F/ '/^templates\/[^/]+\// { print $1 "/" $2 }' \
+        | sort -u > changed_templates.txt
+
+      if [ -s changed_templates.txt ]; then
+        printf '{"include":[' > matrix.json
+        first=1
+        while IFS= read -r TEMPLATE_DIR; do
+          [ -z "$TEMPLATE_DIR" ] && continue
+          TEMPLATE_NAME="$(basename "$TEMPLATE_DIR")"
+          if [ "$first" -eq 1 ]; then
+            first=0
+          else
+            printf ',' >> matrix.json
+          fi
+          printf '{"template":"%s","dir":"%s"}' "$TEMPLATE_NAME" "$TEMPLATE_DIR" >> matrix.json
+        done < changed_templates.txt
+        printf ']}' >> matrix.json
+      else
+        echo '{"include":[]}' > matrix.json
+      fi
+
       if [ ! -s changed_templates.txt ]; then
         echo "No template changes detected under templates/."
       else
