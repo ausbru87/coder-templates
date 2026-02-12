@@ -7,7 +7,7 @@ variables:
   TF_INPUT: "0"
   TF_IN_AUTOMATION: "1"
   AUTO_ACTIVATE: "false"
-  CODER_ORG: "default"
+  CODER_ORG: "coder"
   TF_PLAN_CHECK_STRICT: "false"
   PUSH_ALL: "false"
 

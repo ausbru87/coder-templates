@@ -41,7 +41,7 @@ Pipeline stages:
 
 - `CODER_URL`: `https://dev.zambruhni.com`
 - `CODER_SESSION_TOKEN`: session token with template push permissions
-- `CODER_ORG`: target Coder org (defaults to `default`)
+- `CODER_ORG`: target Coder org (defaults to `coder`)
 - `AUTO_ACTIVATE`: `true`/`false` (defaults to `false`)
 
 Optional:
