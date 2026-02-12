@@ -84,7 +84,7 @@ data "coder_parameter" "system_prompt" {
   description  = "Optional system-level constraints and context"
   mutable      = true
   form_type    = "textarea"
-  default      = "You are a careful coding assistant. Make small, verifiable changes and explain tradeoffs."
+  default      = "You are a careful coding assistant. Make small, verifiable changes and explain tradeoffs. If a preview app is needed, run it on PREVIEW_PORT."
   icon         = "/icon/terminal.svg"
 }
 
@@ -111,6 +111,29 @@ data "coder_parameter" "preview_port" {
 
 locals {
   preview_port = try(data.coder_parameter.preview_port[0].value, 3000)
+  system_prompt = replace(
+    data.coder_parameter.system_prompt.value,
+    "PREVIEW_PORT",
+    tostring(local.preview_port)
+  )
+  claude_settings = {
+    env = {
+      ANTHROPIC_BASE_URL   = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
+      ANTHROPIC_AUTH_TOKEN = data.coder_workspace_owner.me.session_token
+      OPENAI_BASE_URL      = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
+      PREVIEW_PORT         = tostring(local.preview_port)
+      GH_TOKEN             = data.coder_external_auth.github.access_token
+      GH_USERNAME          = data.coder_workspace_owner.me.name
+      GIT_AUTHOR_NAME      = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+      GIT_AUTHOR_EMAIL     = data.coder_workspace_owner.me.email
+      GIT_COMMITTER_NAME   = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+      GIT_COMMITTER_EMAIL  = data.coder_workspace_owner.me.email
+    }
+    autoUpdaterStatus             = "disabled"
+    hasAcknowledgedCostThreshold  = true
+    hasCompletedOnboarding        = true
+    bypassPermissionsModeAccepted = true
+  }
 }
 
 resource "coder_agent" "main" {
@@ -135,15 +158,16 @@ resource "coder_agent" "main" {
   EOT
 
   env = {
-    PREVIEW_PORT        = tostring(local.preview_port)
-    GIT_AUTHOR_NAME     = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-    GIT_AUTHOR_EMAIL    = data.coder_workspace_owner.me.email
-    GIT_COMMITTER_NAME  = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-    GIT_COMMITTER_EMAIL = data.coder_workspace_owner.me.email
-    GH_TOKEN            = data.coder_external_auth.github.access_token
-    ANTHROPIC_BASE_URL  = "https://dev.zambruhni.com/api/v2/aibridge/anthropic"
-    ANTHROPIC_API_BASE  = "https://dev.zambruhni.com/api/v2/aibridge/anthropic"
-    OPENAI_BASE_URL     = "https://dev.zambruhni.com/api/v2/aibridge/openai"
+    PREVIEW_PORT         = tostring(local.preview_port)
+    GIT_AUTHOR_NAME      = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+    GIT_AUTHOR_EMAIL     = data.coder_workspace_owner.me.email
+    GIT_COMMITTER_NAME   = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+    GIT_COMMITTER_EMAIL  = data.coder_workspace_owner.me.email
+    GH_TOKEN             = data.coder_external_auth.github.access_token
+    ANTHROPIC_BASE_URL   = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
+    ANTHROPIC_API_BASE   = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
+    OPENAI_BASE_URL      = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
+    ANTHROPIC_AUTH_TOKEN = data.coder_workspace_owner.me.session_token
   }
 
   metadata {
@@ -184,15 +208,21 @@ resource "coder_env" "openai_api_key" {
 }
 
 module "claude-code" {
-  count         = data.coder_workspace.me.start_count
-  source        = "registry.coder.com/coder/claude-code/coder"
-  version       = "4.4.2"
-  agent_id      = coder_agent.main.id
-  workdir       = "/home/coder/repo"
-  subdomain     = true
-  report_tasks  = true
-  system_prompt = data.coder_parameter.system_prompt.value
-  ai_prompt     = data.coder_parameter.ai_prompt.value
+  count               = data.coder_workspace.me.start_count
+  source              = "registry.coder.com/coder/claude-code/coder"
+  version             = "4.4.2"
+  agent_id            = coder_agent.main.id
+  workdir             = "/home/coder/repo"
+  subdomain           = true
+  report_tasks        = true
+  system_prompt       = local.system_prompt
+  ai_prompt           = data.coder_parameter.ai_prompt.value
+  install_agentapi    = true
+  install_claude_code = true
+  post_install_script = templatefile("scripts/claude/install.sh", {
+    HOME_FOLDER = "/home/coder"
+    SETTINGS    = jsonencode(local.claude_settings)
+  })
 }
 
 resource "coder_ai_task" "this" {
@@ -226,6 +256,12 @@ resource "coder_app" "preview" {
   share        = "owner"
   subdomain    = true
   open_in      = "tab"
+
+  healthcheck {
+    url       = "http://localhost:${local.preview_port}/"
+    interval  = 10
+    threshold = 30
+  }
 }
 
 resource "kubernetes_persistent_volume_claim_v1" "home" {
