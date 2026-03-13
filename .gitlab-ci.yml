@@ -2,11 +2,12 @@ stages:
   - discover
   - validate
   - push
+  - check-versions
 
 variables:
   TF_INPUT: "0"
   TF_IN_AUTOMATION: "1"
-  AUTO_ACTIVATE: "false"
+  AUTO_ACTIVATE: "true"
   CODER_ORG: "coder"
   TF_PLAN_CHECK_STRICT: "false"
   PUSH_ALL: "false"
@@ -154,3 +155,16 @@ push_templates:
           --activate="$AUTO_ACTIVATE" \
           --yes
       done < changed_templates.txt
+
+check_module_versions:
+  stage: check-versions
+  image: alpine:3.20
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+  allow_failure: true
+  before_script:
+    - apk add --no-cache bash curl jq
+  script:
+    - bash scripts/check-module-versions.sh
