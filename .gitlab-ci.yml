@@ -38,7 +38,12 @@ discover_templates:
         echo "Using diff range: ${BASE_SHA}...${HEAD_SHA}"
         git --no-pager diff --name-only "${BASE_SHA}...${HEAD_SHA}" \
           | awk -F/ '$1 == "templates" && $2 != "" { print $1 "/" $2 }' \
-          | sort -u > changed_templates.txt
+          | sort -u > changed_templates_raw.txt
+        # Filter out deleted template directories
+        while IFS= read -r DIR; do
+          [ -d "$DIR" ] && echo "$DIR"
+        done < changed_templates_raw.txt > changed_templates.txt
+        rm -f changed_templates_raw.txt
       fi
 
       if [ -s changed_templates.txt ]; then
