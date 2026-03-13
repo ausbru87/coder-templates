@@ -743,10 +743,6 @@ module "claude-code" {
   })
 }
 
-resource "coder_ai_task" "this" {
-  app_id = try(module.claude-code[0].task_app_id, "00000000-0000-0000-0000-000000000000")
-}
-
 module "mux" {
   count     = local.enable_ai ? data.coder_workspace.me.start_count : 0
   source    = "registry.coder.com/coder/mux/coder"
