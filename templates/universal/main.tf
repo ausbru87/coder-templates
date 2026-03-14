@@ -179,7 +179,7 @@ resource "coder_agent" "main" {
   os   = "linux"
 
   startup_script = <<-EOT
-    set -e
+    #!/bin/bash
     touch ~/.bashrc
 
     # Ensure npm global bin is in PATH
@@ -187,21 +187,21 @@ resource "coder_agent" "main" {
 
     # Install Claude Code CLI
     echo "Installing Claude Code CLI..."
-    npm install -g @anthropic-ai/claude-code@latest 2>&1 || true
+    npm install -g @anthropic-ai/claude-code@latest || true
 
     # Install Codex CLI
     echo "Installing Codex CLI..."
-    npm install -g @openai/codex@latest 2>&1 || true
+    npm install -g @openai/codex@latest || true
 
     # Persist npm global bin in PATH for interactive shells
     NPM_BIN="$(npm config get prefix)/bin"
-    if ! grep -q "$NPM_BIN" ~/.bashrc 2>/dev/null; then
-      echo "export PATH=\"\$PATH:$NPM_BIN\"" >> ~/.bashrc
-    fi
+    grep -q "$NPM_BIN" ~/.bashrc 2>/dev/null || echo "export PATH=\"\$PATH:$NPM_BIN\"" >> ~/.bashrc
 
     # Mux AI provider configuration
     mkdir -p ~/.mux
-    echo '${replace(jsonencode(local.mux_provider_settings), "'", "'\\''")}' > ~/.mux/providers.jsonc
+    cat > ~/.mux/providers.jsonc << 'MUXEOF'
+    ${jsonencode(local.mux_provider_settings)}
+    MUXEOF
 
     echo "=== Workspace Ready ==="
   EOT
