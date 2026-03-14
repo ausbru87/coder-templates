@@ -6,7 +6,7 @@
 #
 # Features (all conditional):
 # - IDEs: code-server (always), VS Code Desktop, Cursor
-# - AI Tools: Claude Code, mux, aider, codex, coder-login
+# - AI Tools: Claude Code, mux, codex, coder-login
 # - Desktop GUI: XFCE via KasmVNC with Chrome + Terminator
 # - DevSecOps: terraform, kubectl, helm, cloud CLIs, trivy, syft, grype
 # - Languages: Python, Node.js, Java, Go, Rust
@@ -167,7 +167,7 @@ data "coder_parameter" "disk_size" {
 data "coder_parameter" "enable_ai_tools" {
   name         = "enable_ai_tools"
   display_name = "Enable AI Tools"
-  description  = "Claude Code, mux, aider, codex, coder-login (all use AI Bridge)"
+  description  = "Claude Code, mux, codex, coder-login (all use AI Bridge)"
   type         = "bool"
   default      = "true"
   mutable      = false
@@ -755,20 +755,9 @@ module "claude-code" {
 module "mux" {
   count     = local.enable_ai ? data.coder_workspace.me.start_count : 0
   source    = "registry.coder.com/coder/mux/coder"
-  version   = "1.0.7"
+  version   = "1.4.3"
   agent_id  = coder_agent.main.id
   subdomain = true
-}
-
-module "aider" {
-  count       = local.enable_ai ? data.coder_workspace.me.start_count : 0
-  source      = "registry.coder.com/coder/aider/coder"
-  version     = "2.0.1"
-  agent_id    = coder_agent.main.id
-  workdir     = "/home/coder"
-  ai_provider = "anthropic"
-  model       = "claude-opus-4-5-20251101"
-  subdomain   = true
 }
 
 module "codex" {
