@@ -7,7 +7,7 @@ Coder template repository deployed to dev.zambruhni.com via GitLab CI. Contains 
 ## Repository Structure
 
 - `templates/ai-dev/main.tf` — The template (all workspace config)
-- `templates/ai-dev/icon.txt` — Template icon (Coder built-in path)
+- `templates/ai-dev/metadata.json` — Template display name and icon
 - `templates/ai-dev/scripts/claude/install.sh` — Claude Code post-install config
 - `versions.json` — Module version registry
 - `scripts/` — Automation scripts (cleanup, version check/update)

@@ -159,10 +159,16 @@ push_templates:
           --message "$CI_COMMIT_TITLE" \
           --activate="$AUTO_ACTIVATE" \
           --yes
-        # Set template icon if an icon.txt exists (contains a URL or built-in path like /icon/code.svg)
-        if [ -f "$TEMPLATE_DIR/icon.txt" ]; then
-          ICON_PATH="$(cat "$TEMPLATE_DIR/icon.txt")"
-          coder templates edit "$TEMPLATE_NAME" --org "$CODER_ORG" --icon "$ICON_PATH" --yes
+        # Apply template metadata (icon, display name) if metadata.json exists
+        if [ -f "$TEMPLATE_DIR/metadata.json" ]; then
+          EDIT_ARGS=""
+          ICON="$(jq -r '.icon // empty' "$TEMPLATE_DIR/metadata.json")"
+          DISPLAY_NAME="$(jq -r '.display_name // empty' "$TEMPLATE_DIR/metadata.json")"
+          [ -n "$ICON" ] && EDIT_ARGS="$EDIT_ARGS --icon $ICON"
+          [ -n "$DISPLAY_NAME" ] && EDIT_ARGS="$EDIT_ARGS --display-name \"$DISPLAY_NAME\""
+          if [ -n "$EDIT_ARGS" ]; then
+            eval coder templates edit "$TEMPLATE_NAME" --org "$CODER_ORG" $EDIT_ARGS --yes
+          fi
         fi
       done < changed_templates.txt
 
