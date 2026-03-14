@@ -1,7 +1,8 @@
 # =============================================================================
 # Universal Kubernetes Development Template
 # =============================================================================
-# Minimal AI-focused template: code-server, Claude Code, and mux.
+# Minimal AI-focused template: code-server + mux web UI, with Claude Code
+# and Codex CLIs installed for terminal use.
 # Pre-configured to use AI Bridge for Anthropic/OpenAI access.
 # =============================================================================
 
@@ -156,24 +157,6 @@ locals {
   ai_bridge_anthropic_url = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
   ai_bridge_openai_url    = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
 
-  claude_settings = {
-    env = {
-      ANTHROPIC_BASE_URL         = local.ai_bridge_anthropic_url
-      OPENAI_BASE_URL            = local.ai_bridge_openai_url
-      ANTHROPIC_MODEL            = "anthropic.claude-opus-4-5-20251101-v1:0"
-      ANTHROPIC_SMALL_FAST_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
-      GH_TOKEN                   = data.coder_external_auth.github.access_token
-      GH_USERNAME                = data.coder_workspace_owner.me.name
-      GIT_AUTHOR_NAME            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-      GIT_AUTHOR_EMAIL           = data.coder_workspace_owner.me.email
-      GIT_COMMITTER_NAME         = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-      GIT_COMMITTER_EMAIL        = data.coder_workspace_owner.me.email
-    }
-    autoUpdaterStatus            = "disabled"
-    hasAcknowledgedCostThreshold = true
-    hasCompletedOnboarding       = true
-  }
-
   mux_provider_settings = {
     "anthropic" = {
       "serviceTier" = "default"
@@ -199,6 +182,16 @@ resource "coder_agent" "main" {
     set -e
     touch ~/.bashrc
 
+    # Install Claude Code CLI
+    if ! command -v claude &> /dev/null; then
+      npm install -g @anthropic-ai/claude-code@latest
+    fi
+
+    # Install Codex CLI
+    if ! command -v codex &> /dev/null; then
+      npm install -g @openai/codex@latest
+    fi
+
     # Mux AI provider configuration
     mkdir -p ~/.mux
     echo '${replace(jsonencode(local.mux_provider_settings), "'", "'\\''")}' > ~/.mux/providers.jsonc
@@ -211,6 +204,7 @@ resource "coder_agent" "main" {
     VISUAL                     = "code"
     ANTHROPIC_BASE_URL         = local.ai_bridge_anthropic_url
     ANTHROPIC_API_BASE         = local.ai_bridge_anthropic_url
+    OPENAI_BASE_URL            = local.ai_bridge_openai_url
     ANTHROPIC_MODEL            = "anthropic.claude-opus-4-5-20251101-v1:0"
     ANTHROPIC_SMALL_FAST_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
   }
@@ -241,6 +235,22 @@ resource "coder_agent" "main" {
 }
 
 # -----------------------------------------------------------------------------
+# AI Bridge API Keys
+# -----------------------------------------------------------------------------
+
+resource "coder_env" "claude_api_key" {
+  agent_id = coder_agent.main.id
+  name     = "CLAUDE_API_KEY"
+  value    = data.coder_workspace_owner.me.session_token
+}
+
+resource "coder_env" "openai_api_key" {
+  agent_id = coder_agent.main.id
+  name     = "OPENAI_API_KEY"
+  value    = data.coder_workspace_owner.me.session_token
+}
+
+# -----------------------------------------------------------------------------
 # Modules
 # -----------------------------------------------------------------------------
 
@@ -253,40 +263,12 @@ module "code-server" {
   subdomain = true
 }
 
-module "claude-code" {
-  count               = data.coder_workspace.me.start_count
-  source              = "registry.coder.com/coder/claude-code/coder"
-  version             = "4.4.2"
-  agent_id            = coder_agent.main.id
-  workdir             = "/home/coder"
-  subdomain           = true
-  report_tasks        = true
-  install_agentapi    = true
-  install_claude_code = true
-  claude_api_key      = data.coder_workspace_owner.me.session_token
-  post_install_script = templatefile("scripts/claude/install.sh", {
-    HOME_FOLDER = "/home/coder"
-    SETTINGS    = jsonencode(local.claude_settings)
-  })
-}
-
 module "mux" {
   count     = data.coder_workspace.me.start_count
   source    = "registry.coder.com/coder/mux/coder"
   version   = "1.4.3"
   agent_id  = coder_agent.main.id
   subdomain = true
-}
-
-module "codex" {
-  count            = data.coder_workspace.me.start_count
-  source           = "registry.coder.com/coder-labs/codex/coder"
-  version          = "4.3.0"
-  agent_id         = coder_agent.main.id
-  workdir          = "/home/coder"
-  subdomain        = true
-  enable_aibridge  = true
-  install_agentapi = true
 }
 
 module "dotfiles" {
