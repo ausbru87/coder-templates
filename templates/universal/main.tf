@@ -187,11 +187,11 @@ resource "coder_agent" "main" {
 
     # Install Claude Code CLI
     echo "Installing Claude Code CLI..."
-    npm install -g @anthropic-ai/claude-code@latest || true
+    sudo npm install -g @anthropic-ai/claude-code@latest || true
 
     # Install Codex CLI
     echo "Installing Codex CLI..."
-    npm install -g @openai/codex@latest || true
+    sudo npm install -g @openai/codex@latest || true
 
     # Persist npm global bin in PATH for interactive shells
     NPM_BIN="$(npm config get prefix)/bin"
