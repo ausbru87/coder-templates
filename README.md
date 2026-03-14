@@ -26,6 +26,30 @@ All AI tools authenticate through Coder's [AI Bridge](https://coder.com/docs/gui
 | `dotfiles_url` | — | Git dotfiles repo URL |
 | `git_repo` | — | Repository to clone on start |
 
+## Task Runners
+
+### `task-runner-claude`
+
+Ephemeral task runner for Claude Code. Receives prompts from the Coder Tasks UI and executes them via the Claude Code agent.
+
+**Included:**
+- Claude Code (registry module — handles install, AgentAPI, web UI, task reporting)
+- code-server (VS Code in the browser)
+- mux (terminal multiplexer with AI provider UI)
+- Preview app (authenticated subdomain proxy)
+
+**Parameters:**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `system_prompt` | — | Instructions for Claude Code |
+| `setup_script` | — | Shell script to run before Claude starts |
+| `preview_port` | 3000 | Port for app preview |
+| `cpu` | 4 | CPU cores (2, 4, 8) |
+| `memory` | 8 | Memory in GB (4, 8, 12, 16, 24) |
+| `disk_size` | 20 | PVC size in GB (immutable after creation) |
+| `git_repo` | — | Repository to clone on start |
+
 ## Repository Structure
 
 ```
@@ -36,16 +60,21 @@ coder-templates/
 │   ├── check-module-versions.sh      # Compare versions.json vs Coder registry
 │   ├── update-module-versions.sh     # Auto-update versions + open GitLab MR
 │   └── cleanup-coder.sh             # Wipe instance and push fresh template
-└── templates/
-    └── ai-dev/
-        ├── main.tf                   # Template definition
-        ├── metadata.json             # Display name and icon
-        └── scripts/claude/install.sh # Claude Code post-install config
+├── templates/
+│   └── ai-dev/
+│       ├── main.tf                   # Template definition
+│       ├── metadata.json             # Display name and icon
+│       └── scripts/claude/install.sh # Claude Code post-install config
+└── task-runners/
+    └── claude-code/
+        ├── main.tf                   # Task runner definition
+        ├── metadata.json             # Display name, icon, and slug
+        └── README.md                 # Task runner documentation
 ```
 
 ## CI Pipeline
 
-Runs on GitLab CI at gitlab.zambruhni.com. Any directory under `templates/` containing a `main.tf` is automatically discovered and processed.
+Runs on GitLab CI at gitlab.zambruhni.com. Any directory under `templates/` or `task-runners/` containing a `main.tf` is automatically discovered and processed.
 
 | Stage | Trigger | Description |
 |---|---|---|

@@ -6,12 +6,18 @@ Coder template repository deployed to dev.zambruhni.com via GitLab CI. Contains 
 
 ## Repository Structure
 
-- `templates/ai-dev/main.tf` — The template (all workspace config)
+- `templates/ai-dev/main.tf` — The ai-dev workspace template
 - `templates/ai-dev/metadata.json` — Template display name and icon
 - `templates/ai-dev/scripts/claude/install.sh` — Claude Code post-install config
+- `task-runners/claude-code/main.tf` — Claude Code task runner template
+- `task-runners/claude-code/metadata.json` — Task runner display name, icon, and slug
 - `versions.json` — Module version registry
 - `scripts/` — Automation scripts (cleanup, version check/update)
 - `.gitlab-ci.yml` — Pipeline config
+
+## Task Runner: claude-code
+
+Ephemeral task runner that receives prompts from the Coder Tasks UI and executes them via Claude Code. Uses `coder_ai_task` + `data.coder_task` resources. The `claude-code` registry module (v4.8.0) handles installation, AgentAPI, web UI, and task reporting. Deployed as `task-runner-claude` (slug defined in metadata.json).
 
 ## Template: ai-dev
 

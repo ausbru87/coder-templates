@@ -14,7 +14,7 @@ templates/<name>/
 └── scripts/          # Optional — helper scripts
 ```
 
-CI automatically discovers any directory under `templates/` that contains a `main.tf`.
+CI automatically discovers any directory under `templates/` or `task-runners/` that contains a `main.tf`.
 
 ### 2. Required Terraform blocks
 
@@ -67,6 +67,48 @@ If your template uses Coder registry modules, add their versions to `versions.js
 ```
 
 The version check scripts (`check-module-versions.sh`, `update-module-versions.sh`) will then track updates for your modules.
+
+## Adding a Task Runner
+
+Task runners live under `task-runners/<name>/` and are discovered by CI alongside regular templates.
+
+### Structure
+
+```
+task-runners/<name>/
+├── main.tf           # Required — task runner definition
+├── README.md         # Recommended — purpose, parameters, apps
+└── metadata.json     # Required — must include "slug" field
+```
+
+### Required metadata.json fields
+
+Task runner directories often don't match the desired Coder template name. Use the `slug` field in `metadata.json` to set the template name explicitly:
+
+```json
+{
+  "display_name": "My Task Runner",
+  "icon": "/icon/code.svg",
+  "slug": "task-runner-my-name"
+}
+```
+
+CI reads `slug` from `metadata.json` first; if absent, it falls back to `basename` of the directory.
+
+### Task-specific resources
+
+Task runners must include these resources to wire into the Coder Tasks UI:
+
+```hcl
+data "coder_task" "me" {}  # provides .prompt from Tasks UI
+
+resource "coder_ai_task" "task" {
+  count  = data.coder_workspace.me.start_count
+  app_id = module.claude-code[count.index].task_app_id
+}
+```
+
+The AI agent module (e.g. `claude-code`) receives the prompt via `ai_prompt = data.coder_task.me.prompt`.
 
 ## Testing Locally
 

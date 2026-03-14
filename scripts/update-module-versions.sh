@@ -51,7 +51,7 @@ for MODULE in $(jq -r 'keys[]' "$VERSIONS_FILE"); do
 
     # Update main.tf files: match version line that follows a source line for this module
     # Pattern: source = "registry.coder.com/coder/<module>/coder" (or coder-labs)
-    find "$REPO_ROOT/templates" -name "main.tf" | while read -r TF_FILE; do
+    find "$REPO_ROOT/templates" "$REPO_ROOT/task-runners" -name "main.tf" 2>/dev/null | while read -r TF_FILE; do
       # Use sed to replace version on the line following the matching source line
       sed -i.bak -E \
         "/source[[:space:]]*=[[:space:]]*\"registry\.coder\.com\/${ORG//\//\\/}\/${MODULE}\/coder\"/{n;s/version[[:space:]]*=[[:space:]]*\"[^\"]+\"/version   = \"${LATEST}\"/;}" \
@@ -74,7 +74,7 @@ echo "Updated modules:"
 echo -e "$UPDATED_MODULES"
 
 # Run terraform init to update lock files
-for TF_DIR in "$REPO_ROOT"/templates/*/; do
+for TF_DIR in "$REPO_ROOT"/templates/*/ "$REPO_ROOT"/task-runners/*/; do
   if [ -f "$TF_DIR/main.tf" ]; then
     echo "Running terraform init in $TF_DIR..."
     (cd "$TF_DIR" && terraform init -upgrade -backend=false) || true
@@ -86,7 +86,7 @@ BRANCH="auto/update-module-versions-$(date +%Y%m%d-%H%M%S)"
 cd "$REPO_ROOT"
 
 git checkout -b "$BRANCH"
-git add versions.json "templates/*/main.tf" "templates/*/.terraform.lock.hcl"
+git add versions.json "templates/*/main.tf" "templates/*/.terraform.lock.hcl" "task-runners/*/main.tf" "task-runners/*/.terraform.lock.hcl"
 git commit -m "chore: update module versions
 
 $(echo -e "$UPDATED_MODULES")"
