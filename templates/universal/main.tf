@@ -182,13 +182,21 @@ resource "coder_agent" "main" {
     set -e
     touch ~/.bashrc
 
-    # Install Claude Code and Codex CLIs
-    if ! command -v claude &> /dev/null; then
-      sudo npm install -g @anthropic-ai/claude-code@latest
-    fi
+    # Ensure npm global bin is in PATH
+    export PATH="$PATH:$(npm config get prefix)/bin"
 
-    if ! command -v codex &> /dev/null; then
-      sudo npm install -g @openai/codex@latest
+    # Install Claude Code CLI
+    echo "Installing Claude Code CLI..."
+    npm install -g @anthropic-ai/claude-code@latest 2>&1 || true
+
+    # Install Codex CLI
+    echo "Installing Codex CLI..."
+    npm install -g @openai/codex@latest 2>&1 || true
+
+    # Persist npm global bin in PATH for interactive shells
+    NPM_BIN="$(npm config get prefix)/bin"
+    if ! grep -q "$NPM_BIN" ~/.bashrc 2>/dev/null; then
+      echo "export PATH=\"\$PATH:$NPM_BIN\"" >> ~/.bashrc
     fi
 
     # Mux AI provider configuration
