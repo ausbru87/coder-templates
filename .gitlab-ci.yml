@@ -160,10 +160,11 @@ push_templates:
           --activate="$AUTO_ACTIVATE" \
           --yes
         # Apply template metadata (icon, display name) if metadata.json exists
+        # Note: jq is not available in the coder image, so use grep/sed
         if [ -f "$TEMPLATE_DIR/metadata.json" ]; then
           EDIT_ARGS=""
-          ICON="$(jq -r '.icon // empty' "$TEMPLATE_DIR/metadata.json")"
-          DISPLAY_NAME="$(jq -r '.display_name // empty' "$TEMPLATE_DIR/metadata.json")"
+          ICON="$(sed -n 's/.*"icon"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$TEMPLATE_DIR/metadata.json")"
+          DISPLAY_NAME="$(sed -n 's/.*"display_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$TEMPLATE_DIR/metadata.json")"
           [ -n "$ICON" ] && EDIT_ARGS="$EDIT_ARGS --icon $ICON"
           [ -n "$DISPLAY_NAME" ] && EDIT_ARGS="$EDIT_ARGS --display-name \"$DISPLAY_NAME\""
           if [ -n "$EDIT_ARGS" ]; then
