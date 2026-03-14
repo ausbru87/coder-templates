@@ -169,10 +169,9 @@ locals {
       GIT_COMMITTER_NAME         = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
       GIT_COMMITTER_EMAIL        = data.coder_workspace_owner.me.email
     }
-    autoUpdaterStatus             = "disabled"
-    hasAcknowledgedCostThreshold  = true
-    hasCompletedOnboarding        = true
-    bypassPermissionsModeAccepted = true
+    autoUpdaterStatus            = "disabled"
+    hasAcknowledgedCostThreshold = true
+    hasCompletedOnboarding       = true
   }
 
   mux_provider_settings = {
