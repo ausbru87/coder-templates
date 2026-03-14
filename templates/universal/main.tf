@@ -159,7 +159,6 @@ locals {
   claude_settings = {
     env = {
       ANTHROPIC_BASE_URL         = local.ai_bridge_anthropic_url
-      ANTHROPIC_AUTH_TOKEN       = data.coder_workspace_owner.me.session_token
       OPENAI_BASE_URL            = local.ai_bridge_openai_url
       ANTHROPIC_MODEL            = "anthropic.claude-opus-4-5-20251101-v1:0"
       ANTHROPIC_SMALL_FAST_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
