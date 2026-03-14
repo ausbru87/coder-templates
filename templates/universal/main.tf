@@ -212,7 +212,6 @@ resource "coder_agent" "main" {
     VISUAL                     = "code"
     ANTHROPIC_BASE_URL         = local.ai_bridge_anthropic_url
     ANTHROPIC_API_BASE         = local.ai_bridge_anthropic_url
-    OPENAI_BASE_URL            = local.ai_bridge_openai_url
     ANTHROPIC_MODEL            = "anthropic.claude-opus-4-5-20251101-v1:0"
     ANTHROPIC_SMALL_FAST_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
   }
@@ -240,16 +239,6 @@ resource "coder_agent" "main" {
     interval     = 60
     timeout      = 1
   }
-}
-
-# -----------------------------------------------------------------------------
-# AI Bridge API Keys
-# -----------------------------------------------------------------------------
-
-resource "coder_env" "openai_api_key" {
-  agent_id = coder_agent.main.id
-  name     = "OPENAI_API_KEY"
-  value    = data.coder_workspace_owner.me.session_token
 }
 
 # -----------------------------------------------------------------------------
@@ -288,6 +277,17 @@ module "mux" {
   version   = "1.4.3"
   agent_id  = coder_agent.main.id
   subdomain = true
+}
+
+module "codex" {
+  count            = data.coder_workspace.me.start_count
+  source           = "registry.coder.com/coder-labs/codex/coder"
+  version          = "4.3.0"
+  agent_id         = coder_agent.main.id
+  workdir          = "/home/coder"
+  subdomain        = true
+  enable_aibridge  = true
+  install_agentapi = true
 }
 
 module "dotfiles" {
