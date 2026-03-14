@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Wipe all workspaces and templates from a Coder instance, then push the fresh universal template.
+# Wipe all workspaces and templates from a Coder instance, then push the fresh ai-dev template.
 set -euo pipefail
 
 CODER_URL="${CODER_URL:-https://dev.zambruhni.com}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATE_DIR="$REPO_ROOT/templates/universal"
+TEMPLATE_DIR="$REPO_ROOT/templates/ai-dev"
 
 echo "=== Coder Cleanup ==="
 echo "Target: $CODER_URL"
@@ -64,17 +64,17 @@ fi
 
 echo ""
 
-# Push fresh universal template
-echo "--- Pushing universal template ---"
+# Push fresh ai-dev template
+echo "--- Pushing ai-dev template ---"
 if [ ! -d "$TEMPLATE_DIR" ]; then
   echo "ERROR: Template directory not found: $TEMPLATE_DIR"
   exit 1
 fi
 
-coder templates push universal \
+coder templates push ai-dev \
   --directory "$TEMPLATE_DIR" \
   --yes
 
 echo ""
 echo "=== Cleanup complete ==="
-echo "Template 'universal' is now the only template on $CODER_URL"
+echo "Template 'ai-dev' is now the only template on $CODER_URL"

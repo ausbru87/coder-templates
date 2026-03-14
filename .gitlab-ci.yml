@@ -152,12 +152,17 @@ push_templates:
         [ -z "$TEMPLATE_DIR" ] && continue
         TEMPLATE_NAME="$(basename "$TEMPLATE_DIR")"
         echo "Pushing template $TEMPLATE_NAME from $TEMPLATE_DIR"
+        ICON_FLAG=""
+        if [ -f "$TEMPLATE_DIR/icon.svg" ]; then
+          ICON_FLAG="--icon $TEMPLATE_DIR/icon.svg"
+        fi
         coder templates push "$TEMPLATE_NAME" \
           --org "$CODER_ORG" \
           --directory "$TEMPLATE_DIR" \
           --name "$CI_COMMIT_SHORT_SHA" \
           --message "$CI_COMMIT_TITLE" \
           --activate="$AUTO_ACTIVATE" \
+          $ICON_FLAG \
           --yes
       done < changed_templates.txt
 

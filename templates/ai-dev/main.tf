@@ -1,9 +1,30 @@
 # =============================================================================
-# Universal Kubernetes Development Template
+# AI Dev — Kubernetes Development Template
 # =============================================================================
-# Minimal AI-focused template: code-server + mux web UI, with Claude Code
-# and Codex CLIs installed for terminal use.
-# Pre-configured to use AI Bridge for Anthropic/OpenAI access.
+# Minimal AI-focused dev environment on Kubernetes.
+#
+# Included tools:
+#   - code-server (VS Code in the browser)
+#   - mux (terminal multiplexer with AI provider UI)
+#   - Claude Code CLI (Anthropic coding agent)
+#   - Codex CLI (OpenAI coding agent)
+#
+# AI access:
+#   All AI tools authenticate through Coder's AI Bridge, which proxies
+#   requests to Anthropic/OpenAI using the workspace owner's Coder session
+#   token. No external API keys are needed.
+#
+# Key environment variables (set on the agent):
+#   ANTHROPIC_BASE_URL / ANTHROPIC_API_BASE — AI Bridge Anthropic endpoint
+#   OPENAI_BASE_URL                         — AI Bridge OpenAI endpoint
+#   CLAUDE_API_KEY                          — session token (for Claude Code CLI)
+#   OPENAI_API_KEY                          — session token (for Codex CLI)
+#
+# Why CLAUDE_API_KEY instead of ANTHROPIC_API_KEY?
+#   Claude Code CLI reads CLAUDE_API_KEY for its primary auth. It uses
+#   ANTHROPIC_BASE_URL to know where to send requests. Setting
+#   ANTHROPIC_API_KEY would also work, but CLAUDE_API_KEY is the canonical
+#   env var for the Claude Code CLI specifically.
 # =============================================================================
 
 terraform {
@@ -49,7 +70,7 @@ data "coder_external_auth" "github" {
 }
 
 # -----------------------------------------------------------------------------
-# Parameters
+# Parameters — workspace sizing and optional features
 # -----------------------------------------------------------------------------
 
 data "coder_parameter" "cpu" {
@@ -150,14 +171,17 @@ data "coder_parameter" "git_repo" {
 }
 
 # -----------------------------------------------------------------------------
-# Locals
+# Locals — AI Bridge URLs and tool configuration
 # -----------------------------------------------------------------------------
 
 locals {
+  # AI Bridge endpoints — proxied through Coder, authenticated via session token
   ai_bridge_anthropic_url = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
   ai_bridge_openai_url    = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
   ai_bridge_openai_v1_url = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai/v1"
 
+  # Claude Code settings.json — written to ~/.claude/settings.json
+  # Controls environment variables, model selection, and onboarding state
   claude_settings = {
     env = {
       ANTHROPIC_BASE_URL         = local.ai_bridge_anthropic_url
@@ -176,6 +200,8 @@ locals {
     hasCompletedOnboarding       = true
   }
 
+  # Claude Code config — written to ~/.claude.json
+  # Contains the API key (session token) and per-project onboarding state
   claude_config = {
     autoUpdaterStatus            = "disabled"
     hasAcknowledgedCostThreshold = true
@@ -189,6 +215,8 @@ locals {
     }
   }
 
+  # Mux provider configuration — written to ~/.mux/providers.jsonc
+  # Configures the Anthropic provider with AI Bridge base URL and models
   mux_provider_settings = {
     "anthropic" = {
       "serviceTier" = "default"
@@ -203,13 +231,19 @@ locals {
 }
 
 # -----------------------------------------------------------------------------
-# Agent
+# Agent — startup script installs CLIs and writes config files
 # -----------------------------------------------------------------------------
 
 resource "coder_agent" "main" {
   arch = data.coder_provisioner.me.arch
   os   = "linux"
 
+  # The startup script runs on every workspace start. It:
+  #   1. Installs Claude Code and Codex CLIs via npm
+  #   2. Adds npm global bin to PATH persistently
+  #   3. Writes Claude Code config (settings.json + .claude.json)
+  #   4. Writes Codex config (config.toml with AI Bridge provider)
+  #   5. Writes Mux provider config (providers.jsonc)
   startup_script = <<-EOT
     #!/bin/bash
     touch ~/.bashrc
@@ -273,6 +307,8 @@ resource "coder_agent" "main" {
     echo "=== Workspace Ready ==="
   EOT
 
+  # Environment variables available to all processes in the workspace.
+  # These point AI tools at the AI Bridge proxy endpoints.
   env = {
     EDITOR                     = "code"
     VISUAL                     = "code"
@@ -309,15 +345,19 @@ resource "coder_agent" "main" {
 }
 
 # -----------------------------------------------------------------------------
-# AI Bridge API Keys
+# AI Bridge API Keys — injected as env vars via coder_env
 # -----------------------------------------------------------------------------
+# These use the workspace owner's Coder session token as the "API key".
+# AI Bridge validates this token and proxies requests to the real AI providers.
 
+# CLAUDE_API_KEY — used by Claude Code CLI for authentication
 resource "coder_env" "claude_api_key" {
   agent_id = coder_agent.main.id
   name     = "CLAUDE_API_KEY"
   value    = data.coder_workspace_owner.me.session_token
 }
 
+# OPENAI_API_KEY — used by Codex CLI for authentication
 resource "coder_env" "openai_api_key" {
   agent_id = coder_agent.main.id
   name     = "OPENAI_API_KEY"
@@ -325,9 +365,10 @@ resource "coder_env" "openai_api_key" {
 }
 
 # -----------------------------------------------------------------------------
-# Modules
+# Coder Registry Modules
 # -----------------------------------------------------------------------------
 
+# code-server — VS Code in the browser, accessible via subdomain
 module "code-server" {
   count     = data.coder_workspace.me.start_count
   source    = "registry.coder.com/coder/code-server/coder"
@@ -337,6 +378,7 @@ module "code-server" {
   subdomain = true
 }
 
+# mux — terminal multiplexer with built-in AI provider switching UI
 module "mux" {
   count     = data.coder_workspace.me.start_count
   source    = "registry.coder.com/coder/mux/coder"
@@ -345,6 +387,7 @@ module "mux" {
   subdomain = true
 }
 
+# dotfiles — clone and apply user dotfiles on workspace start
 module "dotfiles" {
   count        = data.coder_parameter.dotfiles_url.value != "" ? data.coder_workspace.me.start_count : 0
   source       = "registry.coder.com/coder/dotfiles/coder"
@@ -353,6 +396,7 @@ module "dotfiles" {
   dotfiles_uri = data.coder_parameter.dotfiles_url.value
 }
 
+# git-clone — clone a repo into /home/coder on workspace start
 module "git-clone" {
   count    = data.coder_parameter.git_repo.value != "" ? data.coder_workspace.me.start_count : 0
   source   = "registry.coder.com/coder/git-clone/coder"

@@ -1,104 +1,111 @@
-# Coder Templates (dev.zambruhni.com)
+# Coder Templates
 
-Single consolidated Coder template for Kubernetes-based development workspaces. Deployed via GitLab CI to [dev.zambruhni.com](https://dev.zambruhni.com).
+Coder workspace templates for Kubernetes-based development environments. Deployed via GitLab CI to [dev.zambruhni.com](https://dev.zambruhni.com).
 
-## Template: `universal`
+## Templates
 
-One template with feature toggles instead of multiple specialized templates.
+### `ai-dev`
 
-### Parameters
+Minimal AI-focused development environment.
 
-| Parameter | Type | Default | Immutable | Description |
-|---|---|---|---|---|
-| `dotfiles_url` | string | `""` | yes | Git dotfiles repo URL |
-| `git_repo` | string | `""` | yes | Repository to clone on start |
-| `cpu` | number | `4` | no | CPU cores (2, 4, 8) |
-| `memory` | number | `8` | no | Memory in GB (4, 8, 12, 16, 24) |
-| `disk_size` | number | `20` | yes | PVC size in GB (10, 20, 50) |
-| `enable_ai_tools` | bool | `true` | yes | Claude Code, mux, aider, codex, coder-login |
-| `enable_desktop` | bool | `false` | yes | XFCE + KasmVNC + Chrome + Terminator |
-| `enable_devsecops` | bool | `false` | yes | terraform, kubectl, helm, cloud CLIs, security scanners |
-| `install_python` | bool | `true` | yes | Python 3 + pip + poetry |
-| `install_node` | bool | `true` | yes | Node.js global packages (pnpm, typescript, eslint) |
-| `install_java` | bool | `false` | yes | OpenJDK 21 + Maven + Gradle |
-| `install_go` | bool | `false` | yes | Go + gopls + delve |
-| `install_rust` | bool | `false` | yes | Rust via rustup |
-| `enable_filebrowser` | bool | `false` | yes | Web file manager |
-| `enable_vscode_desktop` | bool | `false` | yes | VS Code Desktop connector |
-| `enable_cursor` | bool | `false` | yes | Cursor IDE connector |
+**Included:**
+- code-server (VS Code in the browser)
+- mux (terminal multiplexer with AI provider UI)
+- Claude Code CLI (Anthropic coding agent)
+- Codex CLI (OpenAI coding agent)
 
-### Always included
-- code-server (web VS Code) with Roo Code extension (when AI enabled)
-- GitHub CLI
-- Starship prompt
-- Base dev tools (git, curl, jq, ripgrep, fd, bat, fzf, direnv, build-essential)
+All AI tools authenticate through Coder's [AI Bridge](https://coder.com/docs/guides/using-ai-tools-in-coder) — no external API keys needed. The workspace owner's Coder session token is used as the API key, and requests are proxied through the Coder server.
 
-### AI tools (when `enable_ai_tools = true`)
-All AI tools use Coder's AI Bridge — no external API keys needed.
-- **Claude Code** — AI coding agent in browser
-- **mux** — terminal multiplexer with AI provider config
-- **aider** — AI pair programming
-- **codex** — OpenAI coding agent
-- **coder-login** — automatic Coder CLI auth
-- **Roo Code** — VS Code extension (auto-configured)
+**Parameters:**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `cpu` | 4 | CPU cores (2, 4, 8) |
+| `memory` | 8 | Memory in GB (4, 8, 12, 16, 24) |
+| `disk_size` | 20 | PVC size in GB (immutable after creation) |
+| `dotfiles_url` | — | Git dotfiles repo URL |
+| `git_repo` | — | Repository to clone on start |
 
 ## Repository Structure
 
 ```
 coder-templates/
-├── .gitlab-ci.yml          # CI pipeline: discover → validate → push → check-versions
-├── versions.json           # Module version registry (single source of truth)
-├── ci/
-│   └── discover_templates.py
+├── .gitlab-ci.yml                    # CI: discover → validate → push
+├── versions.json                     # Module version registry
 ├── scripts/
-│   ├── check-module-versions.sh   # Compare versions.json vs Coder registry
-│   ├── update-module-versions.sh  # Auto-update versions + open GitLab MR
-│   └── cleanup-coder.sh           # Wipe instance and push fresh template
+│   ├── check-module-versions.sh      # Compare versions.json vs Coder registry
+│   ├── update-module-versions.sh     # Auto-update versions + open GitLab MR
+│   └── cleanup-coder.sh             # Wipe instance and push fresh template
 └── templates/
-    └── universal/
-        ├── main.tf
-        └── scripts/claude/install.sh
+    └── ai-dev/
+        ├── main.tf                   # Template definition
+        ├── icon.svg                  # Template icon
+        └── scripts/claude/install.sh # Claude Code post-install config
 ```
 
 ## CI Pipeline
 
-Runs on GitLab CI at gitlab.zambruhni.com.
+Runs on GitLab CI at gitlab.zambruhni.com. Any directory under `templates/` containing a `main.tf` is automatically discovered and processed.
 
 | Stage | Trigger | Description |
 |---|---|---|
 | `discover` | MR or push to main | Detect changed templates via git diff |
 | `validate` | After discover | `terraform fmt -check`, `init`, `validate`, plan check |
-| `push` | Main branch only | `coder templates push` with auto-activate |
+| `push` | Main branch only | `coder templates push` with auto-activate and icon |
 | `check-versions` | Weekly schedule or manual | Check Coder registry for module updates |
 
-### CI Variables (set in GitLab)
+**Required CI variables** (set in GitLab):
 - `CODER_URL` — Coder instance URL
 - `CODER_SESSION_TOKEN` — Coder API token
 
+## Creating a Workspace
+
+```bash
+coder login https://dev.zambruhni.com
+# Via CLI
+coder create my-workspace --template ai-dev
+# Or use the web UI at https://dev.zambruhni.com
+```
+
+## AI Bridge Environment Variables
+
+These are set automatically on every workspace:
+
+| Variable | Purpose |
+|---|---|
+| `CLAUDE_API_KEY` | Session token for Claude Code CLI |
+| `OPENAI_API_KEY` | Session token for Codex CLI |
+| `ANTHROPIC_BASE_URL` | AI Bridge Anthropic endpoint |
+| `ANTHROPIC_API_BASE` | AI Bridge Anthropic endpoint (alt) |
+| `OPENAI_BASE_URL` | AI Bridge OpenAI endpoint |
+| `ANTHROPIC_MODEL` | Default Claude model |
+| `ANTHROPIC_SMALL_FAST_MODEL` | Default fast model |
+
 ## Module Version Management
 
-`versions.json` tracks all Coder registry module versions. Scripts in `scripts/` automate checking and updating:
+`versions.json` tracks all Coder registry module versions used by templates.
 
 ```bash
 # Check for outdated modules
 ./scripts/check-module-versions.sh
 
-# Auto-update versions and open MR
+# Auto-update versions and open GitLab MR
 GITLAB_PROJECT_ID=123 GITLAB_TOKEN=xxx ./scripts/update-module-versions.sh
 ```
 
 ## Local Development
 
 ```bash
-# Validate
-cd templates/universal
+cd templates/ai-dev
+
+# Format, init, validate
 terraform fmt -check
 terraform init -backend=false
 terraform validate
 
 # Push manually
 coder login https://dev.zambruhni.com
-coder templates push universal --directory templates/universal --yes
+coder templates push ai-dev --directory templates/ai-dev --yes
 
 # Full cleanup + fresh push
 ./scripts/cleanup-coder.sh
