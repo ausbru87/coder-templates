@@ -341,6 +341,12 @@ resource "coder_agent" "main" {
 
     echo "=== Universal Workspace Setup ==="
 
+    # Ensure .bashrc exists (fresh PVC won't have one; modules like codex source it)
+    touch ~/.bashrc
+
+    # Non-interactive apt to avoid debconf prompts (e.g. VS Code installer)
+    export DEBIAN_FRONTEND=noninteractive
+
     # Remove stale Yarn apt repo (expired GPG key in enterprise-node image)
     sudo rm -f /etc/apt/sources.list.d/yarn.list 2>/dev/null || true
 
@@ -579,9 +585,12 @@ resource "coder_agent" "main" {
 
     # GitLab CLI
     if ! command -v glab &> /dev/null; then
-      curl -fsSL "https://gitlab.com/gitlab-org/cli/-/releases/permalink/latest/downloads/glab_$(dpkg --print-architecture).deb" -o /tmp/glab.deb || true
-      sudo apt-get install -y /tmp/glab.deb || true
-      rm -f /tmp/glab.deb
+      GLAB_VERSION=$(curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases" | head -c 4096 | grep -o '"tag_name":"v[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/^v//')
+      if [ -n "$GLAB_VERSION" ]; then
+        curl -fsSL "https://gitlab.com/gitlab-org/cli/-/releases/v$${GLAB_VERSION}/downloads/glab_$${GLAB_VERSION}_linux_$(dpkg --print-architecture).deb" -o /tmp/glab.deb || true
+        sudo apt-get install -y /tmp/glab.deb || true
+        rm -f /tmp/glab.deb
+      fi
     fi
     %{endif}
 
