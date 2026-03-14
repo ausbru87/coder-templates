@@ -182,14 +182,13 @@ resource "coder_agent" "main" {
     set -e
     touch ~/.bashrc
 
-    # Install Claude Code CLI
+    # Install Claude Code and Codex CLIs
     if ! command -v claude &> /dev/null; then
-      npm install -g @anthropic-ai/claude-code@latest
+      sudo npm install -g @anthropic-ai/claude-code@latest
     fi
 
-    # Install Codex CLI
     if ! command -v codex &> /dev/null; then
-      npm install -g @openai/codex@latest
+      sudo npm install -g @openai/codex@latest
     fi
 
     # Mux AI provider configuration
