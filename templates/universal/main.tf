@@ -247,12 +247,6 @@ resource "coder_agent" "main" {
 # AI Bridge API Keys
 # -----------------------------------------------------------------------------
 
-resource "coder_env" "anthropic_api_key" {
-  agent_id = coder_agent.main.id
-  name     = "ANTHROPIC_API_KEY"
-  value    = data.coder_workspace_owner.me.session_token
-}
-
 resource "coder_env" "openai_api_key" {
   agent_id = coder_agent.main.id
   name     = "OPENAI_API_KEY"
@@ -282,6 +276,7 @@ module "claude-code" {
   report_tasks        = true
   install_agentapi    = true
   install_claude_code = true
+  claude_api_key      = data.coder_workspace_owner.me.session_token
   post_install_script = templatefile("scripts/claude/install.sh", {
     HOME_FOLDER = "/home/coder"
     SETTINGS    = jsonencode(local.claude_settings)
