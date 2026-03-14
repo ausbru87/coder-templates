@@ -39,7 +39,7 @@ coder-templates/
 └── templates/
     └── ai-dev/
         ├── main.tf                   # Template definition
-        ├── icon.svg                  # Template icon
+        ├── icon.txt                  # Template icon (Coder built-in path)
         └── scripts/claude/install.sh # Claude Code post-install config
 ```
 

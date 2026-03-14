@@ -9,7 +9,7 @@ Guide for adding and maintaining templates in this repository.
 ```
 templates/<name>/
 ├── main.tf           # Required — template definition
-├── icon.svg          # Recommended — displayed in Coder UI
+├── icon.txt          # Recommended — Coder icon path (e.g., /icon/code.svg)
 └── scripts/          # Optional — helper scripts
 ```
 
@@ -43,7 +43,7 @@ data "coder_workspace_owner" "me" {}
 
 ### 3. Add an icon
 
-Create an SVG at `templates/<name>/icon.svg`. The CI pipeline passes it to `coder templates push` via the `--icon` flag.
+Create `templates/<name>/icon.txt` containing a Coder built-in icon path (e.g., `/icon/code.svg`). After pushing, CI runs `coder templates edit --icon` with this value. Browse available icons in the Coder UI template editor.
 
 ### 4. Track module versions
 
