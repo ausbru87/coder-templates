@@ -9,6 +9,7 @@ Guide for adding and maintaining templates in this repository.
 ```
 templates/<name>/
 ├── main.tf           # Required — template definition
+├── README.md         # Recommended — what the template provides, parameters, env vars
 ├── icon.txt          # Recommended — Coder icon path (e.g., /icon/code.svg)
 └── scripts/          # Optional — helper scripts
 ```
