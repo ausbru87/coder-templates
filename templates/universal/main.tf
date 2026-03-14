@@ -156,6 +156,38 @@ data "coder_parameter" "git_repo" {
 locals {
   ai_bridge_anthropic_url = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
   ai_bridge_openai_url    = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
+  ai_bridge_openai_v1_url = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai/v1"
+
+  claude_settings = {
+    env = {
+      ANTHROPIC_BASE_URL         = local.ai_bridge_anthropic_url
+      OPENAI_BASE_URL            = local.ai_bridge_openai_url
+      ANTHROPIC_MODEL            = "anthropic.claude-opus-4-5-20251101-v1:0"
+      ANTHROPIC_SMALL_FAST_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
+      GH_TOKEN                   = data.coder_external_auth.github.access_token
+      GH_USERNAME                = data.coder_workspace_owner.me.name
+      GIT_AUTHOR_NAME            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+      GIT_AUTHOR_EMAIL           = data.coder_workspace_owner.me.email
+      GIT_COMMITTER_NAME         = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+      GIT_COMMITTER_EMAIL        = data.coder_workspace_owner.me.email
+    }
+    autoUpdaterStatus            = "disabled"
+    hasAcknowledgedCostThreshold = true
+    hasCompletedOnboarding       = true
+  }
+
+  claude_config = {
+    autoUpdaterStatus            = "disabled"
+    hasAcknowledgedCostThreshold = true
+    hasCompletedOnboarding       = true
+    primaryApiKey                = data.coder_workspace_owner.me.session_token
+    projects = {
+      "/home/coder" = {
+        hasCompletedProjectOnboarding = true
+        hasTrustDialogAccepted        = true
+      }
+    }
+  }
 
   mux_provider_settings = {
     "anthropic" = {
@@ -197,7 +229,42 @@ resource "coder_agent" "main" {
     NPM_BIN="$(npm config get prefix)/bin"
     grep -q "$NPM_BIN" ~/.bashrc 2>/dev/null || echo "export PATH=\"\$PATH:$NPM_BIN\"" >> ~/.bashrc
 
+    # Claude Code configuration
+    echo "Configuring Claude Code..."
+    mkdir -p ~/.claude
+    cat > ~/.claude/settings.json << 'CLAUDESETTINGS'
+    ${jsonencode(local.claude_settings)}
+    CLAUDESETTINGS
+    cat > ~/.claude.json << 'CLAUDECONFIG'
+    ${jsonencode(local.claude_config)}
+    CLAUDECONFIG
+
+    # Codex configuration (AI Bridge)
+    echo "Configuring Codex..."
+    mkdir -p ~/.codex
+    cat > ~/.codex/config.toml << 'CODEXEOF'
+    sandbox_mode = "workspace-write"
+    approval_policy = "never"
+    preferred_auth_method = "apikey"
+    profile = "aibridge"
+
+    [sandbox_workspace_write]
+    network_access = true
+
+    [model_providers.aibridge]
+    name = "AI Bridge"
+    base_url = "${local.ai_bridge_openai_v1_url}"
+    env_key = "OPENAI_API_KEY"
+    wire_api = "responses"
+
+    [profiles.aibridge]
+    model_provider = "aibridge"
+    model = "gpt-5.3-codex"
+    model_reasoning_effort = "medium"
+    CODEXEOF
+
     # Mux AI provider configuration
+    echo "Configuring Mux..."
     mkdir -p ~/.mux
     cat > ~/.mux/providers.jsonc << 'MUXEOF'
     ${jsonencode(local.mux_provider_settings)}
