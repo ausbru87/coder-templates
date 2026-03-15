@@ -50,6 +50,28 @@ Ephemeral task runner for Claude Code. Receives prompts from the Coder Tasks UI 
 | `disk_size` | 20 | PVC size in GB (immutable after creation) |
 | `git_repo` | — | Repository to clone on start |
 
+### `task-runner-codex`
+
+Ephemeral task runner for OpenAI Codex. Receives prompts from the Coder Tasks UI and executes them via the Codex agent.
+
+**Included:**
+- Codex (registry module — handles install, AgentAPI, web UI, task reporting)
+- code-server (VS Code in the browser)
+- mux (terminal multiplexer with AI provider UI)
+- Preview app (authenticated subdomain proxy)
+
+**Parameters:**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `system_prompt` | — | Instructions for Codex |
+| `setup_script` | — | Shell script to run before Codex starts |
+| `preview_port` | 3000 | Port for app preview |
+| `cpu` | 4 | CPU cores (2, 4, 8) |
+| `memory` | 8 | Memory in GB (4, 8, 12, 16, 24) |
+| `disk_size` | 20 | PVC size in GB (immutable after creation) |
+| `git_repo` | — | Repository to clone on start |
+
 ## Repository Structure
 
 ```
@@ -66,7 +88,11 @@ coder-templates/
 │       ├── metadata.json             # Display name and icon
 │       └── scripts/claude/install.sh # Claude Code post-install config
 └── task-runners/
-    └── claude-code/
+    ├── claude-code/
+    │   ├── main.tf                   # Task runner definition
+    │   ├── metadata.json             # Display name, icon, and slug
+    │   └── README.md                 # Task runner documentation
+    └── codex/
         ├── main.tf                   # Task runner definition
         ├── metadata.json             # Display name, icon, and slug
         └── README.md                 # Task runner documentation

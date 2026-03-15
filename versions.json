@@ -3,5 +3,6 @@
   "mux": "1.4.3",
   "dotfiles": "1.0.23",
   "git-clone": "1.0.22",
-  "claude-code": "4.8.0"
+  "claude-code": "4.8.0",
+  "codex": "4.3.0"
 }
