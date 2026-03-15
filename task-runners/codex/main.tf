@@ -291,6 +291,17 @@ module "codex" {
   codex_system_prompt = data.coder_parameter.system_prompt.value
   post_install_script = data.coder_parameter.setup_script.value
   order               = 1
+
+  # Use danger-full-access sandbox to avoid interactive trust prompts in
+  # containerized (K8s) workspaces. approval_policy=never ensures fully
+  # autonomous operation. No [notice.model_migrations] section so Codex
+  # auto-accepts model upgrades without prompting.
+  base_config_toml = <<-EOT
+    sandbox_mode = "danger-full-access"
+    approval_policy = "never"
+    preferred_auth_method = "apikey"
+    profile = "aibridge"
+  EOT
 }
 
 # code-server — VS Code in the browser, accessible via subdomain
