@@ -299,6 +299,7 @@ module "claude-code" {
   workdir             = "/home/coder"
   ai_prompt           = data.coder_task.me.prompt
   enable_aibridge     = true
+  subdomain           = true
   system_prompt       = data.coder_parameter.system_prompt.value
   post_install_script = data.coder_parameter.setup_script.value
   order               = 1
