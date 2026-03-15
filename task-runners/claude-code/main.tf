@@ -198,8 +198,8 @@ locals {
     "anthropic" = {
       "serviceTier" = "default"
       "models" = [
-        "anthropic.claude-haiku-4-5-20251001-v1:0",
-        "anthropic.claude-opus-4-5-20251101-v1:0"
+        "claude-haiku-4-5-20251001",
+        "claude-opus-4-6-20250610"
       ]
       "baseUrl" = local.ai_bridge_anthropic_url
       "apiKey"  = data.coder_workspace_owner.me.session_token

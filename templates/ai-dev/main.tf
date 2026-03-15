@@ -184,16 +184,14 @@ locals {
   # Controls environment variables, model selection, and onboarding state
   claude_settings = {
     env = {
-      ANTHROPIC_BASE_URL         = local.ai_bridge_anthropic_url
-      OPENAI_BASE_URL            = local.ai_bridge_openai_url
-      ANTHROPIC_MODEL            = "anthropic.claude-opus-4-5-20251101-v1:0"
-      ANTHROPIC_SMALL_FAST_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
-      GH_TOKEN                   = data.coder_external_auth.github.access_token
-      GH_USERNAME                = data.coder_workspace_owner.me.name
-      GIT_AUTHOR_NAME            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-      GIT_AUTHOR_EMAIL           = data.coder_workspace_owner.me.email
-      GIT_COMMITTER_NAME         = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-      GIT_COMMITTER_EMAIL        = data.coder_workspace_owner.me.email
+      ANTHROPIC_BASE_URL  = local.ai_bridge_anthropic_url
+      OPENAI_BASE_URL     = local.ai_bridge_openai_url
+      GH_TOKEN            = data.coder_external_auth.github.access_token
+      GH_USERNAME         = data.coder_workspace_owner.me.name
+      GIT_AUTHOR_NAME     = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+      GIT_AUTHOR_EMAIL    = data.coder_workspace_owner.me.email
+      GIT_COMMITTER_NAME  = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+      GIT_COMMITTER_EMAIL = data.coder_workspace_owner.me.email
     }
     autoUpdaterStatus            = "disabled"
     hasAcknowledgedCostThreshold = true
@@ -221,8 +219,8 @@ locals {
     "anthropic" = {
       "serviceTier" = "default"
       "models" = [
-        "anthropic.claude-haiku-4-5-20251001-v1:0",
-        "anthropic.claude-opus-4-5-20251101-v1:0"
+        "claude-haiku-4-5-20251001",
+        "claude-opus-4-6-20250610"
       ]
       "baseUrl" = local.ai_bridge_anthropic_url
       "apiKey"  = data.coder_workspace_owner.me.session_token
@@ -310,13 +308,11 @@ resource "coder_agent" "main" {
   # Environment variables available to all processes in the workspace.
   # These point AI tools at the AI Bridge proxy endpoints.
   env = {
-    EDITOR                     = "code"
-    VISUAL                     = "code"
-    ANTHROPIC_BASE_URL         = local.ai_bridge_anthropic_url
-    ANTHROPIC_API_BASE         = local.ai_bridge_anthropic_url
-    OPENAI_BASE_URL            = local.ai_bridge_openai_url
-    ANTHROPIC_MODEL            = "anthropic.claude-opus-4-5-20251101-v1:0"
-    ANTHROPIC_SMALL_FAST_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
+    EDITOR             = "code"
+    VISUAL             = "code"
+    ANTHROPIC_BASE_URL = local.ai_bridge_anthropic_url
+    ANTHROPIC_API_BASE = local.ai_bridge_anthropic_url
+    OPENAI_BASE_URL    = local.ai_bridge_openai_url
   }
 
   metadata {
