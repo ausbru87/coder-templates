@@ -235,11 +235,9 @@ resource "coder_agent" "main" {
   EOT
 
   env = {
-    ANTHROPIC_BASE_URL         = local.ai_bridge_anthropic_url
-    ANTHROPIC_API_BASE         = local.ai_bridge_anthropic_url
-    OPENAI_BASE_URL            = local.ai_bridge_openai_url
-    ANTHROPIC_MODEL            = "anthropic.claude-opus-4-5-20251101-v1:0"
-    ANTHROPIC_SMALL_FAST_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
+    ANTHROPIC_BASE_URL = local.ai_bridge_anthropic_url
+    ANTHROPIC_API_BASE = local.ai_bridge_anthropic_url
+    OPENAI_BASE_URL    = local.ai_bridge_openai_url
   }
 
   metadata {
