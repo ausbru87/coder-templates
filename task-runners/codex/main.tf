@@ -292,15 +292,26 @@ module "codex" {
   post_install_script = data.coder_parameter.setup_script.value
   order               = 1
 
-  # Use danger-full-access sandbox to avoid interactive trust prompts in
-  # containerized (K8s) workspaces. approval_policy=never ensures fully
-  # autonomous operation. No [notice.model_migrations] section so Codex
-  # auto-accepts model upgrades without prompting.
+  # Fully autonomous config for task runners:
+  # - danger-full-access: no sandbox trust prompts in K8s containers
+  # - approval_policy=never: auto-approve all operations
+  # - projects./home/coder.trust_level=trusted: skip directory trust prompt
+  # - notice.hide_*: suppress all model migration and warning prompts
   base_config_toml = <<-EOT
     sandbox_mode = "danger-full-access"
     approval_policy = "never"
     preferred_auth_method = "apikey"
     profile = "aibridge"
+
+    [projects."/home/coder"]
+    trust_level = "trusted"
+
+    [notice]
+    hide_full_access_warning = true
+    hide_gpt5_1_migration_prompt = true
+    "hide_gpt-5.1-codex-max_migration_prompt" = true
+    hide_rate_limit_model_nudge = true
+    hide_world_writable_warning = true
   EOT
 }
 
