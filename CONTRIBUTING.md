@@ -14,7 +14,7 @@ templates/<name>/
 └── scripts/          # Optional — helper scripts
 ```
 
-CI automatically discovers any directory under `templates/` or `task-runners/` that contains a `main.tf`.
+CI automatically discovers any directory under `templates/` that contains a `main.tf`.
 
 ### 2. Required Terraform blocks
 
@@ -70,20 +70,20 @@ The version check scripts (`check-module-versions.sh`, `update-module-versions.s
 
 ## Adding a Task Runner
 
-Task runners live under `task-runners/<name>/` and are discovered by CI alongside regular templates.
+Task runners live under `templates/task-runner-<name>/` alongside regular templates.
 
 ### Structure
 
 ```
-task-runners/<name>/
+templates/task-runner-<name>/
 ├── main.tf           # Required — task runner definition
 ├── README.md         # Recommended — purpose, parameters, apps
 └── metadata.json     # Required — must include "slug" field
 ```
 
-### Required metadata.json fields
+### metadata.json
 
-Task runner directories often don't match the desired Coder template name. Use the `slug` field in `metadata.json` to set the template name explicitly:
+Use the `slug` field in `metadata.json` to set the Coder template name explicitly (CI falls back to `basename` of the directory if absent):
 
 ```json
 {
@@ -92,8 +92,6 @@ Task runner directories often don't match the desired Coder template name. Use t
   "slug": "task-runner-my-name"
 }
 ```
-
-CI reads `slug` from `metadata.json` first; if absent, it falls back to `basename` of the directory.
 
 ### Task-specific resources
 

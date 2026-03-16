@@ -11,21 +11,21 @@ Coder template repository deployed to dev.zambruhni.com via GitLab CI. Contains 
 - `templates/ai-dev/scripts/claude/install.sh` — Claude Code post-install config
 - `templates/aws-dev/main.tf` — The aws-dev workspace template (AWS + Kiro)
 - `templates/aws-dev/metadata.json` — Template display name and icon
-- `task-runners/claude-code/main.tf` — Claude Code task runner template
-- `task-runners/claude-code/metadata.json` — Task runner display name, icon, and slug
-- `task-runners/codex/main.tf` — Codex task runner template
-- `task-runners/codex/metadata.json` — Task runner display name, icon, and slug
+- `templates/task-runner-claude/main.tf` — Claude Code task runner template
+- `templates/task-runner-claude/metadata.json` — Task runner display name, icon, and slug
+- `templates/task-runner-codex/main.tf` — Codex task runner template
+- `templates/task-runner-codex/metadata.json` — Task runner display name, icon, and slug
 - `versions.json` — Module version registry
 - `scripts/` — Automation scripts (cleanup, version check/update)
 - `.gitlab-ci.yml` — Pipeline config
 
-## Task Runner: claude-code
+## Task Runner: task-runner-claude
 
-Ephemeral task runner that receives prompts from the Coder Tasks UI and executes them via Claude Code. Uses `coder_ai_task` + `data.coder_task` resources. The `claude-code` registry module (v4.8.0) handles installation, AgentAPI, web UI, and task reporting. Deployed as `task-runner-claude` (slug defined in metadata.json).
+Ephemeral task runner that receives prompts from the Coder Tasks UI and executes them via Claude Code. Uses `coder_ai_task` + `data.coder_task` resources. The `claude-code` registry module (v4.8.0) handles installation, AgentAPI, web UI, and task reporting. Located at `templates/task-runner-claude/`.
 
-## Task Runner: codex
+## Task Runner: task-runner-codex
 
-Ephemeral task runner that receives prompts from the Coder Tasks UI and executes them via OpenAI Codex. Uses `coder_ai_task` + `data.coder_task` resources. The `codex` registry module (v4.3.0, from `coder-labs` org) handles installation, AgentAPI, web UI, and task reporting. Deployed as `task-runner-codex` (slug defined in metadata.json).
+Ephemeral task runner that receives prompts from the Coder Tasks UI and executes them via OpenAI Codex. Uses `coder_ai_task` + `data.coder_task` resources. The `codex` registry module (v4.3.0, from `coder-labs` org) handles installation, AgentAPI, web UI, and task reporting. Located at `templates/task-runner-codex/`.
 
 ## Template: aws-dev
 

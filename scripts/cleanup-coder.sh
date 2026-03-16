@@ -77,4 +77,4 @@ coder templates push ai-dev \
 
 echo ""
 echo "=== Cleanup complete ==="
-echo "Template 'ai-dev' is now the only template on $CODER_URL"
+echo "Template 'ai-dev' pushed to $CODER_URL"

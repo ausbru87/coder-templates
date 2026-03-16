@@ -18,7 +18,6 @@ discover_templates:
   rules:
     - changes:
         - templates/**/*
-        - task-runners/**/*
         - ci/discover_templates.py
         - .gitlab-ci.yml
     - if: '$CI_PIPELINE_SOURCE == "web"'
@@ -34,11 +33,11 @@ discover_templates:
       HEAD_SHA="$CI_COMMIT_SHA"
       if [ "$PUSH_ALL" = "true" ]; then
         echo "PUSH_ALL=true set; discovering all templates."
-        { find templates -mindepth 1 -maxdepth 1 -type d; find task-runners -mindepth 1 -maxdepth 1 -type d 2>/dev/null; } | sort > changed_templates.txt
+        find templates -mindepth 1 -maxdepth 1 -type d | sort > changed_templates.txt
       else
         echo "Using diff range: ${BASE_SHA}...${HEAD_SHA}"
         git --no-pager diff --name-only "${BASE_SHA}...${HEAD_SHA}" \
-          | awk -F/ '($1 == "templates" || $1 == "task-runners") && $2 != "" { print $1 "/" $2 }' \
+          | awk -F/ '$1 == "templates" && $2 != "" { print $1 "/" $2 }' \
           | sort -u > changed_templates_raw.txt
         # Filter out deleted template directories
         while IFS= read -r DIR; do
@@ -67,7 +66,7 @@ discover_templates:
       fi
 
       if [ ! -s changed_templates.txt ]; then
-        echo "No template changes detected under templates/ or task-runners/."
+        echo "No template changes detected under templates/."
       else
         echo "Changed templates:"
         cat changed_templates.txt
@@ -88,7 +87,6 @@ validate_templates:
   rules:
     - changes:
         - templates/**/*
-        - task-runners/**/*
         - ci/discover_templates.py
         - .gitlab-ci.yml
     - if: '$CI_PIPELINE_SOURCE == "web"'
@@ -138,7 +136,6 @@ push_templates:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
         - templates/**/*
-        - task-runners/**/*
         - ci/discover_templates.py
         - .gitlab-ci.yml
     - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "main"'

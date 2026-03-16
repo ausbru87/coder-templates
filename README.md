@@ -110,24 +110,23 @@ coder-templates/
 │   │   ├── main.tf                   # Template definition
 │   │   ├── metadata.json             # Display name and icon
 │   │   └── scripts/claude/install.sh # Claude Code post-install config
-│   └── aws-dev/
-│       ├── main.tf                   # Template definition (AWS + Kiro)
-│       ├── metadata.json             # Display name and icon
-│       └── README.md                 # Template documentation
-└── task-runners/
-    ├── claude-code/
-    │   ├── main.tf                   # Task runner definition
-    │   ├── metadata.json             # Display name, icon, and slug
-    │   └── README.md                 # Task runner documentation
-    └── codex/
-        ├── main.tf                   # Task runner definition
-        ├── metadata.json             # Display name, icon, and slug
-        └── README.md                 # Task runner documentation
+│   ├── aws-dev/
+│   │   ├── main.tf                   # Template definition (AWS + Kiro)
+│   │   ├── metadata.json             # Display name and icon
+│   │   └── README.md                 # Template documentation
+│   ├── task-runner-claude/
+│   │   ├── main.tf                   # Task runner definition
+│   │   ├── metadata.json             # Display name, icon, and slug
+│   │   └── README.md                 # Task runner documentation
+│   └── task-runner-codex/
+│       ├── main.tf                   # Task runner definition
+│       ├── metadata.json             # Display name, icon, and slug
+│       └── README.md                 # Task runner documentation
 ```
 
 ## CI Pipeline
 
-Runs on GitLab CI at gitlab.zambruhni.com. Any directory under `templates/` or `task-runners/` containing a `main.tf` is automatically discovered and processed.
+Runs on GitLab CI at gitlab.zambruhni.com. Any directory under `templates/` containing a `main.tf` is automatically discovered and processed.
 
 | Stage | Trigger | Description |
 |---|---|---|
