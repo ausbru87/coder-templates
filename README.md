@@ -26,6 +26,29 @@ All AI tools authenticate through Coder's [AI Bridge](https://coder.com/docs/gui
 | `dotfiles_url` | — | Git dotfiles repo URL |
 | `git_repo` | — | Repository to clone on start |
 
+### `aws-dev`
+
+AWS-focused development environment with Kiro as the primary AI agent.
+
+**Included:**
+- Kiro Desktop IDE (primary AI coding agent)
+- VS Code Desktop
+- code-server (VS Code in the browser)
+- AWS CDK CLI
+- Kiro CLI
+
+Kiro authenticates independently via AWS Builder ID, IAM Identity Center, GitHub, or Google — no AI Bridge or external API keys needed.
+
+**Parameters:**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `cpu` | 4 | CPU cores (2, 4, 8) |
+| `memory` | 8 | Memory in GB (4, 8, 12, 16, 24) |
+| `disk_size` | 20 | PVC size in GB (immutable after creation) |
+| `dotfiles_url` | — | Git dotfiles repo URL |
+| `git_repo` | — | Repository to clone on start |
+
 ## Task Runners
 
 ### `task-runner-claude`
@@ -83,10 +106,14 @@ coder-templates/
 │   ├── update-module-versions.sh     # Auto-update versions + open GitLab MR
 │   └── cleanup-coder.sh             # Wipe instance and push fresh template
 ├── templates/
-│   └── ai-dev/
-│       ├── main.tf                   # Template definition
+│   ├── ai-dev/
+│   │   ├── main.tf                   # Template definition
+│   │   ├── metadata.json             # Display name and icon
+│   │   └── scripts/claude/install.sh # Claude Code post-install config
+│   └── aws-dev/
+│       ├── main.tf                   # Template definition (AWS + Kiro)
 │       ├── metadata.json             # Display name and icon
-│       └── scripts/claude/install.sh # Claude Code post-install config
+│       └── README.md                 # Template documentation
 └── task-runners/
     ├── claude-code/
     │   ├── main.tf                   # Task runner definition

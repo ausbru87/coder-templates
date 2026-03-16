@@ -9,6 +9,8 @@ Coder template repository deployed to dev.zambruhni.com via GitLab CI. Contains 
 - `templates/ai-dev/main.tf` — The ai-dev workspace template
 - `templates/ai-dev/metadata.json` — Template display name and icon
 - `templates/ai-dev/scripts/claude/install.sh` — Claude Code post-install config
+- `templates/aws-dev/main.tf` — The aws-dev workspace template (AWS + Kiro)
+- `templates/aws-dev/metadata.json` — Template display name and icon
 - `task-runners/claude-code/main.tf` — Claude Code task runner template
 - `task-runners/claude-code/metadata.json` — Task runner display name, icon, and slug
 - `task-runners/codex/main.tf` — Codex task runner template
@@ -24,6 +26,17 @@ Ephemeral task runner that receives prompts from the Coder Tasks UI and executes
 ## Task Runner: codex
 
 Ephemeral task runner that receives prompts from the Coder Tasks UI and executes them via OpenAI Codex. Uses `coder_ai_task` + `data.coder_task` resources. The `codex` registry module (v4.3.0, from `coder-labs` org) handles installation, AgentAPI, web UI, and task reporting. Deployed as `task-runner-codex` (slug defined in metadata.json).
+
+## Template: aws-dev
+
+Provisions a Kubernetes pod with:
+- **Kiro Desktop IDE** — primary AI coding agent (external app, `kiro://` protocol)
+- **VS Code Desktop** — VS Code Desktop connection (external app)
+- **code-server** — VS Code in the browser
+- **AWS CDK CLI** — installed via npm on startup
+- **Kiro CLI** — installed via curl on startup
+
+Kiro authenticates independently via AWS Builder ID, IAM Identity Center, GitHub, or Google. No AI Bridge or Coder API keys are needed.
 
 ## Template: ai-dev
 
