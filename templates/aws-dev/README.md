@@ -17,14 +17,22 @@ AWS-focused development environment with Kiro as the primary AI agent. Runs on K
 
 ## Authentication
 
-Kiro authenticates independently — no AI Bridge or Coder API keys are needed. Supported auth methods:
+**You must authenticate to Kiro after workspace creation.** Kiro manages its own credentials independently — no AI Bridge or Coder API keys are used.
+
+Open a terminal in the workspace and run:
+
+```bash
+kiro-cli login
+```
+
+Supported auth methods:
 
 - AWS Builder ID
 - IAM Identity Center
 - GitHub
 - Google
 
-Run `kiro-cli login` in the workspace terminal to authenticate, or pre-configure credentials.
+AWS services require separate credentials. Run `aws configure` or set `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` environment variables.
 
 ## Parameters
 
@@ -44,6 +52,7 @@ coder create my-workspace --template aws-dev
 
 Once the workspace is running:
 
-1. Open Kiro Desktop via the workspace dashboard
-2. Run `aws configure` to set up AWS credentials
-3. Run `cdk init` to scaffold a new CDK project
+1. Run `kiro-cli login` in the terminal to authenticate Kiro
+2. Open Kiro Desktop via the workspace dashboard
+3. Run `aws configure` to set up AWS credentials
+4. Run `cdk init` to scaffold a new CDK project
