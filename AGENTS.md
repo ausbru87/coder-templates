@@ -15,6 +15,10 @@ Coder template repository deployed to dev.zambruhni.com via GitLab CI. Contains 
 - `templates/task-runner-claude/metadata.json` — Task runner display name, icon, and slug
 - `templates/task-runner-codex/main.tf` — Codex task runner template
 - `templates/task-runner-codex/metadata.json` — Task runner display name, icon, and slug
+- `templates/task-runner-gemini/main.tf` — Gemini CLI task runner template (no AI Bridge — requires `gemini_api_key` variable)
+- `templates/task-runner-gemini/metadata.json` — Task runner display name, icon, and slug
+- `templates/task-runner-kiro/main.tf` — Kiro CLI task runner template (no AI Bridge — requires `kiro_auth_tarball` variable)
+- `templates/task-runner-kiro/metadata.json` — Task runner display name, icon, and slug
 - `versions.json` — Module version registry
 - `scripts/` — Automation scripts (cleanup, version check/update)
 - `.gitlab-ci.yml` — Pipeline config
@@ -22,6 +26,18 @@ Coder template repository deployed to dev.zambruhni.com via GitLab CI. Contains 
 ## Task Runner: task-runner-claude
 
 Ephemeral task runner that receives prompts from the Coder Tasks UI and executes them via Claude Code. Uses `coder_ai_task` + `data.coder_task` resources. The `claude-code` registry module (v4.8.0) handles installation, AgentAPI, web UI, and task reporting. Located at `templates/task-runner-claude/`.
+
+## Task Runner: task-runner-gemini
+
+Ephemeral task runner that receives prompts from the Coder Tasks UI and executes them via Google Gemini CLI. Uses `coder_ai_task` + `data.coder_task` resources. The `gemini` registry module (v3.0.0, from `coder-labs` org) handles installation, AgentAPI, web UI, and task reporting. Located at `templates/task-runner-gemini/`.
+
+**⚠️ AI Bridge not supported.** Requires a `gemini_api_key` Terraform variable set at template push time. Obtain a key at https://aistudio.google.com/apikey. Pass via `--variable gemini_api_key=<key>` when pushing.
+
+## Task Runner: task-runner-kiro
+
+Ephemeral task runner that receives prompts from the Coder Tasks UI and executes them via Kiro CLI. Uses `coder_ai_task` + `data.coder_task` resources. The `kiro-cli` registry module (v1.0.1, from `harleylrn` org) handles installation, AgentAPI, web UI, and task reporting. Located at `templates/task-runner-kiro/`.
+
+**⚠️ AI Bridge not supported.** Requires a `kiro_auth_tarball` Terraform variable (sensitive) set at template push time. Generate with: `tar -C ~/.local/share -c kiro-cli | zstd | base64 -w0` on a machine with `kiro-cli login` already completed. Pass via `--variable kiro_auth_tarball=<base64>` when pushing.
 
 ## Task Runner: task-runner-codex
 
@@ -71,6 +87,8 @@ Installs CLIs and writes config files on every workspace start:
 ### Module Versions
 
 Terraform requires literal version strings in `module` blocks. `versions.json` is the source of truth; `scripts/update-module-versions.sh` uses sed to propagate versions into `.tf` files.
+
+Registry orgs for version scripts: `codex` and `gemini` use `coder-labs`; `kiro-cli` uses `harleylrn`; all others use `coder`.
 
 ## Essential Commands
 

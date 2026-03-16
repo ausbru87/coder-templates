@@ -19,10 +19,12 @@ echo ""
 for MODULE in $(jq -r 'keys[]' "$VERSIONS_FILE"); do
   CURRENT=$(jq -r ".[\"$MODULE\"]" "$VERSIONS_FILE")
 
-  # Determine the registry org (codex is under coder-labs)
+  # Determine the registry org
+  # codex, gemini → coder-labs; kiro-cli → harleylrn; all others → coder
   case "$MODULE" in
-    codex) ORG="coder-labs" ;;
-    *)     ORG="coder" ;;
+    codex|gemini) ORG="coder-labs" ;;
+    kiro-cli)     ORG="harleylrn" ;;
+    *)            ORG="coder" ;;
   esac
 
   # Query the Coder module registry API

@@ -21,9 +21,12 @@ echo "Checking for module updates..."
 for MODULE in $(jq -r 'keys[]' "$VERSIONS_FILE"); do
   CURRENT=$(jq -r ".[\"$MODULE\"]" "$VERSIONS_FILE")
 
+  # Determine the registry org
+  # codex, gemini → coder-labs; kiro-cli → harleylrn; all others → coder
   case "$MODULE" in
-    codex) ORG="coder-labs" ;;
-    *)     ORG="coder" ;;
+    codex|gemini) ORG="coder-labs" ;;
+    kiro-cli)     ORG="harleylrn" ;;
+    *)            ORG="coder" ;;
   esac
 
   REGISTRY_URL="https://registry.coder.com/api/v2/modules/${ORG}/${MODULE}/versions"
