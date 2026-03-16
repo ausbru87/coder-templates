@@ -179,10 +179,14 @@ resource "coder_agent" "main" {
     #!/bin/bash
     touch ~/.bashrc
 
-    # Ensure npm global bin is in PATH
-    export PATH="$PATH:$(npm config get prefix)/bin"
+    # Add npm global bin and ~/.local/bin to PATH for this script and future shells
     NPM_BIN="$(npm config get prefix)/bin"
-    grep -q "$NPM_BIN" ~/.bashrc 2>/dev/null || echo "export PATH=\"\$PATH:$NPM_BIN\"" >> ~/.bashrc
+    export PATH="$HOME/.local/bin:$NPM_BIN:$PATH"
+
+    # Persist PATH additions in .profile (sourced by login shells / Coder terminal)
+    for P in "$HOME/.local/bin" "$NPM_BIN"; do
+      grep -qF "$P" ~/.profile 2>/dev/null || echo "export PATH=\"$P:\$PATH\"" >> ~/.profile
+    done
 
     # Install AWS CDK CLI
     echo "Installing AWS CDK..."
@@ -191,9 +195,6 @@ resource "coder_agent" "main" {
     # Install Kiro CLI
     echo "Installing Kiro CLI..."
     curl -fsSL https://cli.kiro.dev/install | bash || true
-    # Add kiro to PATH if installed to ~/.local/bin
-    grep -q '\.local/bin' ~/.bashrc 2>/dev/null || echo 'export PATH="$PATH:$HOME/.local/bin"' >> ~/.bashrc
-    export PATH="$PATH:$HOME/.local/bin"
 
     echo "=== Workspace Ready ==="
   EOT
