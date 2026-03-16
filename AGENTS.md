@@ -58,8 +58,8 @@ The session token (`data.coder_workspace_owner.me.session_token`) is injected as
 ### Startup Script
 
 Installs CLIs and writes config files on every workspace start:
-1. Install Claude Code + Codex via `npm install -g`
-2. Add npm global bin to PATH
+1. Install Claude Code via native installer (`curl`), Codex via `npm install -g`
+2. Add npm global bin and `~/.local/bin` to PATH
 3. Write `~/.claude/settings.json` and `~/.claude.json`
 4. Write `~/.codex/config.toml` (AI Bridge provider)
 5. Write `~/.mux/providers.jsonc` (Anthropic provider)

@@ -6,7 +6,7 @@
 # Included tools:
 #   - code-server (VS Code in the browser)
 #   - mux (terminal multiplexer with AI provider UI)
-#   - Claude Code CLI (Anthropic coding agent)
+#   - Claude Code CLI (Anthropic coding agent, native install)
 #   - Codex CLI (OpenAI coding agent)
 #
 # AI access:
@@ -237,8 +237,8 @@ resource "coder_agent" "main" {
   os   = "linux"
 
   # The startup script runs on every workspace start. It:
-  #   1. Installs Claude Code and Codex CLIs via npm
-  #   2. Adds npm global bin to PATH persistently
+  #   1. Sets up PATH for npm global bin, ~/.local/bin
+  #   2. Installs Claude Code CLI (native installer) and Codex CLI (npm)
   #   3. Writes Claude Code config (settings.json + .claude.json)
   #   4. Writes Codex config (config.toml with AI Bridge provider)
   #   5. Writes Mux provider config (providers.jsonc)
@@ -246,20 +246,22 @@ resource "coder_agent" "main" {
     #!/bin/bash
     touch ~/.bashrc
 
-    # Ensure npm global bin is in PATH
-    export PATH="$PATH:$(npm config get prefix)/bin"
+    # Set up PATH for this script (npm global bin + ~/.local/bin for native installs)
+    NPM_BIN="$(npm config get prefix)/bin"
+    export PATH="$HOME/.local/bin:$NPM_BIN:$PATH"
 
-    # Install Claude Code CLI
+    # Persist PATH additions in .profile (sourced by login shells / Coder terminal)
+    for P in "$HOME/.local/bin" "$NPM_BIN"; do
+      grep -qF "$P" ~/.profile 2>/dev/null || echo "export PATH=\"$P:\$PATH\"" >> ~/.profile
+    done
+
+    # Install Claude Code CLI (native installer — auto-updates, no Node.js dependency)
     echo "Installing Claude Code CLI..."
-    sudo npm install -g @anthropic-ai/claude-code@latest || true
+    curl -fsSL https://claude.ai/install.sh | bash || true
 
     # Install Codex CLI
     echo "Installing Codex CLI..."
     sudo npm install -g @openai/codex@latest || true
-
-    # Persist npm global bin in PATH for interactive shells
-    NPM_BIN="$(npm config get prefix)/bin"
-    grep -q "$NPM_BIN" ~/.bashrc 2>/dev/null || echo "export PATH=\"\$PATH:$NPM_BIN\"" >> ~/.bashrc
 
     # Claude Code configuration
     echo "Configuring Claude Code..."
