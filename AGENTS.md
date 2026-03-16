@@ -31,7 +31,6 @@ Ephemeral task runner that receives prompts from the Coder Tasks UI and executes
 
 Provisions a Kubernetes pod with:
 - **Kiro Desktop IDE** — primary AI coding agent (external app, `kiro://` protocol)
-- **VS Code Desktop** — VS Code Desktop connection (external app)
 - **code-server** — VS Code in the browser
 - **AWS CDK CLI** — installed via npm on startup
 - **Kiro CLI** — installed via curl on startup

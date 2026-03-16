@@ -5,6 +5,5 @@
   "git-clone": "1.0.22",
   "claude-code": "4.8.0",
   "codex": "4.3.0",
-  "kiro": "1.0.0",
-  "vscode-desktop": "1.1.1"
+  "kiro": "1.0.0"
 }

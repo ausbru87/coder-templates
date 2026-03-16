@@ -7,7 +7,6 @@ AWS-focused development environment with Kiro as the primary AI agent. Runs on K
 | App | Type | Description |
 |-----|------|-------------|
 | Kiro Desktop | External (`kiro://`) | Kiro IDE — primary AI coding agent |
-| VS Code Desktop | External (`vscode://`) | VS Code Desktop connection |
 | code-server | Browser (subdomain) | VS Code in the browser |
 
 ## AWS Tooling

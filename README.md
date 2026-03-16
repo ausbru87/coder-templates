@@ -32,7 +32,6 @@ AWS-focused development environment with Kiro as the primary AI agent.
 
 **Included:**
 - Kiro Desktop IDE (primary AI coding agent)
-- VS Code Desktop
 - code-server (VS Code in the browser)
 - AWS CDK CLI
 - Kiro CLI

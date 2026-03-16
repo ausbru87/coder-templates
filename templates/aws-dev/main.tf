@@ -5,7 +5,6 @@
 #
 # Included tools:
 #   - Kiro Desktop IDE (external app via kiro:// protocol)
-#   - VS Code Desktop (external app)
 #   - code-server (VS Code in the browser)
 #   - AWS CDK CLI (installed via npm)
 #   - Kiro CLI (installed via curl)
@@ -242,15 +241,6 @@ module "kiro" {
   order    = 1
 }
 
-# vscode-desktop — VS Code Desktop connection
-module "vscode-desktop" {
-  count    = data.coder_workspace.me.start_count
-  source   = "registry.coder.com/coder/vscode-desktop/coder"
-  version  = "1.1.1"
-  agent_id = coder_agent.main.id
-  order    = 2
-}
-
 # code-server — VS Code in the browser, accessible via subdomain
 module "code-server" {
   count     = data.coder_workspace.me.start_count
@@ -259,7 +249,7 @@ module "code-server" {
   agent_id  = coder_agent.main.id
   folder    = "/home/coder"
   subdomain = true
-  order     = 3
+  order     = 2
 }
 
 # dotfiles — clone and apply user dotfiles on workspace start
