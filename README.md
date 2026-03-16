@@ -6,15 +6,19 @@ Coder workspace templates for Kubernetes-based development environments. Deploye
 
 ### `ai-dev`
 
-Minimal AI-focused development environment.
+AI-focused development environment with multiple IDEs and coding agents.
 
 **Included:**
 - code-server (VS Code in the browser)
+- Kiro IDE (Desktop IDE)
+- Cursor IDE (Desktop IDE)
 - mux (terminal multiplexer with AI provider UI)
-- Claude Code CLI (Anthropic coding agent)
-- Codex CLI (OpenAI coding agent)
+- Claude Code CLI (Anthropic, native install)
+- Codex CLI (OpenAI, npm)
+- Gemini CLI (Google, npm)
+- Kiro CLI (AWS, curl install)
 
-All AI tools authenticate through Coder's [AI Bridge](https://coder.com/docs/guides/using-ai-tools-in-coder) — no external API keys needed. The workspace owner's Coder session token is used as the API key, and requests are proxied through the Coder server.
+Claude Code, Codex, and Gemini CLI authenticate through Coder's [AI Bridge](https://coder.com/docs/guides/using-ai-tools-in-coder) — no external API keys needed. Kiro authenticates independently via AWS Builder ID, IAM Identity Center, GitHub, or Google.
 
 **Parameters:**
 

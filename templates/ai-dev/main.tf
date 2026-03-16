@@ -1,18 +1,25 @@
 # =============================================================================
 # AI Dev — Kubernetes Development Template
 # =============================================================================
-# Minimal AI-focused dev environment on Kubernetes.
+# AI-focused dev environment on Kubernetes.
 #
 # Included tools:
-#   - code-server (VS Code in the browser)
-#   - mux (terminal multiplexer with AI provider UI)
-#   - Claude Code CLI (Anthropic coding agent, native install)
-#   - Codex CLI (OpenAI coding agent)
+#   Web IDEs:
+#     - code-server (VS Code in the browser)
+#     - mux (terminal multiplexer with AI provider UI)
+#   Desktop IDEs:
+#     - Kiro IDE (AWS/Anthropic coding agent)
+#     - Cursor IDE (AI-powered VS Code fork)
+#   Terminal CLIs:
+#     - Claude Code (Anthropic, native install)
+#     - Codex (OpenAI, npm)
+#     - Gemini CLI (Google, npm)
+#     - Kiro CLI (AWS, curl install)
 #
 # AI access:
-#   All AI tools authenticate through Coder's AI Bridge, which proxies
-#   requests to Anthropic/OpenAI using the workspace owner's Coder session
-#   token. No external API keys are needed.
+#   Claude Code, Codex, and Gemini CLI authenticate through Coder's AI
+#   Bridge, which proxies requests using the workspace owner's session
+#   token. Kiro authenticates independently (AWS Builder ID, etc.).
 #
 # Key environment variables (set on the agent):
 #   ANTHROPIC_BASE_URL / ANTHROPIC_API_BASE — AI Bridge Anthropic endpoint
@@ -238,7 +245,7 @@ resource "coder_agent" "main" {
 
   # The startup script runs on every workspace start. It:
   #   1. Sets up PATH for npm global bin, ~/.local/bin
-  #   2. Installs Claude Code CLI (native installer) and Codex CLI (npm)
+  #   2. Installs Claude Code (native), Codex (npm), Gemini CLI (npm), Kiro CLI (curl)
   #   3. Writes Claude Code config (settings.json + .claude.json)
   #   4. Writes Codex config (config.toml with AI Bridge provider)
   #   5. Writes Mux provider config (providers.jsonc)
@@ -262,6 +269,14 @@ resource "coder_agent" "main" {
     # Install Codex CLI
     echo "Installing Codex CLI..."
     sudo npm install -g @openai/codex@latest || true
+
+    # Install Gemini CLI
+    echo "Installing Gemini CLI..."
+    sudo npm install -g @google/gemini-cli@latest || true
+
+    # Install Kiro CLI
+    echo "Installing Kiro CLI..."
+    curl -fsSL https://cli.kiro.dev/install | bash || true
 
     # Claude Code configuration
     echo "Configuring Claude Code..."
@@ -366,6 +381,8 @@ resource "coder_env" "openai_api_key" {
 # Coder Registry Modules
 # -----------------------------------------------------------------------------
 
+# --- Web IDEs ---
+
 # code-server — VS Code in the browser, accessible via subdomain
 module "code-server" {
   count     = data.coder_workspace.me.start_count
@@ -374,7 +391,35 @@ module "code-server" {
   agent_id  = coder_agent.main.id
   folder    = "/home/coder"
   subdomain = true
+  group     = "Web IDEs"
+  order     = 1
 }
+
+# --- Desktop IDEs ---
+
+# kiro — Kiro Desktop IDE connection (external app, kiro:// protocol)
+module "kiro" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/kiro/coder"
+  version  = "1.0.0"
+  agent_id = coder_agent.main.id
+  folder   = "/home/coder"
+  group    = "Desktop IDEs"
+  order    = 2
+}
+
+# cursor — Cursor Desktop IDE connection (external app)
+module "cursor" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/cursor/coder"
+  version  = "1.4.1"
+  agent_id = coder_agent.main.id
+  folder   = "/home/coder"
+  group    = "Desktop IDEs"
+  order    = 3
+}
+
+# --- Terminal ---
 
 # mux — terminal multiplexer with built-in AI provider switching UI
 module "mux" {
@@ -383,6 +428,8 @@ module "mux" {
   version   = "1.4.3"
   agent_id  = coder_agent.main.id
   subdomain = true
+  group     = "Terminal"
+  order     = 4
 }
 
 # dotfiles — clone and apply user dotfiles on workspace start

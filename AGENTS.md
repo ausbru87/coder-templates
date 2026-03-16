@@ -40,12 +40,16 @@ Kiro authenticates independently via AWS Builder ID, IAM Identity Center, GitHub
 ## Template: ai-dev
 
 Provisions a Kubernetes pod with:
-- **code-server** — VS Code in the browser
-- **mux** — terminal multiplexer with AI provider UI
-- **Claude Code CLI** — Anthropic coding agent (installed via npm)
-- **Codex CLI** — OpenAI coding agent (installed via npm)
+- **code-server** — VS Code in the browser (Web IDEs group)
+- **Kiro IDE** — AWS/Anthropic Desktop IDE (Desktop IDEs group)
+- **Cursor IDE** — AI-powered VS Code fork (Desktop IDEs group)
+- **mux** — terminal multiplexer with AI provider UI (Terminal group)
+- **Claude Code CLI** — Anthropic coding agent (native install)
+- **Codex CLI** — OpenAI coding agent (npm)
+- **Gemini CLI** — Google coding agent (npm)
+- **Kiro CLI** — AWS coding agent (curl install)
 
-All AI tools authenticate through Coder's AI Bridge using the workspace owner's session token. No external API keys needed.
+Claude Code, Codex, and Gemini CLI authenticate through Coder's AI Bridge. Kiro authenticates independently.
 
 ### AI Bridge
 
@@ -58,7 +62,7 @@ The session token (`data.coder_workspace_owner.me.session_token`) is injected as
 ### Startup Script
 
 Installs CLIs and writes config files on every workspace start:
-1. Install Claude Code via native installer (`curl`), Codex via `npm install -g`
+1. Install Claude Code (native), Codex (npm), Gemini CLI (npm), Kiro CLI (curl)
 2. Add npm global bin and `~/.local/bin` to PATH
 3. Write `~/.claude/settings.json` and `~/.claude.json`
 4. Write `~/.codex/config.toml` (AI Bridge provider)
