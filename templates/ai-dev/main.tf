@@ -405,7 +405,7 @@ module "kiro" {
   agent_id = coder_agent.main.id
   folder   = "/home/coder"
   group    = "Desktop IDEs"
-  order    = 2
+  order    = 3
 }
 
 # cursor — Cursor Desktop IDE connection (external app)
@@ -416,10 +416,8 @@ module "cursor" {
   agent_id = coder_agent.main.id
   folder   = "/home/coder"
   group    = "Desktop IDEs"
-  order    = 3
+  order    = 4
 }
-
-# --- Terminal ---
 
 # mux — terminal multiplexer with built-in AI provider switching UI
 module "mux" {
@@ -428,8 +426,8 @@ module "mux" {
   version   = "1.4.3"
   agent_id  = coder_agent.main.id
   subdomain = true
-  group     = "Terminal"
-  order     = 4
+  group     = "Web IDEs"
+  order     = 2
 }
 
 # dotfiles — clone and apply user dotfiles on workspace start
