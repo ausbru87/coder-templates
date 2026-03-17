@@ -13,7 +13,6 @@
 #   Web IDEs:
 #     - code-server (VS Code in the browser)
 #     - mux (terminal multiplexer with AI provider UI)
-#     - KasmVNC (optional browser-based desktop, parameter-controlled)
 #   Terminal CLIs:
 #     - Claude Code (Anthropic, native install)
 #     - Codex (OpenAI, npm)
@@ -165,16 +164,6 @@ data "coder_parameter" "dotfiles_url" {
   icon         = "/icon/dotfiles.svg"
 }
 
-data "coder_parameter" "enable_kasmvnc" {
-  name         = "enable_kasmvnc"
-  display_name = "Enable Desktop (KasmVNC)"
-  description  = "Enable a browser-based desktop environment via KasmVNC"
-  type         = "bool"
-  default      = "false"
-  mutable      = true
-  icon         = "/icon/kasmvnc.svg"
-}
-
 data "coder_parameter" "git_repo" {
   name         = "git_repo"
   display_name = "Git Repository"
@@ -293,14 +282,6 @@ resource "coder_agent" "main" {
       doxygen \
       pkg-config \
       || true
-
-    # Install xfce4 desktop environment if KasmVNC is enabled
-    if [ "${data.coder_parameter.enable_kasmvnc.value}" = "true" ]; then
-      echo "Installing XFCE desktop for KasmVNC..."
-      sudo apt-get install -y --no-install-recommends \
-        xfce4 xfce4-terminal dbus-x11 \
-        || true
-    fi
 
     # Install Claude Code CLI (native installer — auto-updates, no Node.js dependency)
     echo "Installing Claude Code CLI..."
@@ -444,18 +425,6 @@ module "mux" {
   subdomain = true
   group     = "Web IDEs"
   order     = 2
-}
-
-# kasmvnc — browser-based desktop (optional, controlled by parameter)
-module "kasmvnc" {
-  count               = data.coder_parameter.enable_kasmvnc.value == "true" ? data.coder_workspace.me.start_count : 0
-  source              = "registry.coder.com/coder/kasmvnc/coder"
-  version             = "1.2.6"
-  agent_id            = coder_agent.main.id
-  desktop_environment = "xfce"
-  subdomain           = true
-  group               = "Web IDEs"
-  order               = 3
 }
 
 # dotfiles — clone and apply user dotfiles on workspace start
