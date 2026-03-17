@@ -8,5 +8,6 @@
   "gemini": "3.0.0",
   "kiro": "1.0.0",
   "kiro-cli": "1.0.1",
-  "cursor": "1.4.1"
+  "cursor": "1.4.1",
+  "kasmvnc": "1.2.6"
 }
