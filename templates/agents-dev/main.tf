@@ -1,34 +1,27 @@
 # =============================================================================
-# prgm_123 Dev Env — C++ Development Template
+# Agents Dev — Kubernetes Development Template for Coder Agents
 # =============================================================================
-# C++ focused dev environment on Kubernetes with full debugging toolchain
-# and AI terminal tools.
+# Well-tooled development workspace designed for the Coder Agents feature
+# (CODER_EXPERIMENTS=agents). The LLM runs server-side on the control plane
+# via `chatd` and connects to workspace agents remotely using tools like
+# execute, read_file, and write_file.
+#
+# Because AI runs on the control plane, this template does NOT include:
+#   - AI Bridge env vars or URLs
+#   - Claude Code / Codex / Gemini CLI / Kiro CLI installations
+#   - coder_ai_task or data.coder_task resources
+#   - API key injection via coder_env
+#   - Any LLM provider configuration
 #
 # Included tools:
-#   C++ Toolchain:
-#     - gcc, g++, clang, clang-format, clang-tidy
-#     - cmake, make, ninja-build
-#     - gdb, lldb, valgrind, strace, ltrace
-#     - ccache, cppcheck, bear, lld, doxygen, pkg-config
 #   Web IDEs:
 #     - code-server (VS Code in the browser)
-#     - mux (terminal multiplexer with AI provider UI)
-#   Terminal CLIs:
-#     - Claude Code (Anthropic, native install)
-#     - Codex (OpenAI, npm)
-#     - Gemini CLI (Google, npm)
-#     - Kiro CLI (AWS, curl install)
-#
-# AI access:
-#   Claude Code, Codex, and Gemini CLI authenticate through Coder's AI
-#   Bridge, which proxies requests using the workspace owner's session
-#   token. Kiro authenticates independently (AWS Builder ID, etc.).
-#
-# Key environment variables (set on the agent):
-#   ANTHROPIC_BASE_URL / ANTHROPIC_API_BASE — AI Bridge Anthropic endpoint
-#   OPENAI_BASE_URL                         — AI Bridge OpenAI endpoint
-#   CLAUDE_API_KEY                          — session token (for Claude Code CLI)
-#   OPENAI_API_KEY                          — session token (for Codex CLI)
+#     - mux (terminal multiplexer)
+#   Desktop IDEs:
+#     - Cursor IDE (AI-powered VS Code fork)
+#   System packages (installed on startup):
+#     - git, curl, jq, ripgrep, fd-find, build-essential
+#     - python3, python3-pip, unzip
 # =============================================================================
 
 terraform {
@@ -82,7 +75,7 @@ data "coder_parameter" "cpu" {
   display_name = "CPU Cores"
   description  = "CPU limit for the workspace pod"
   type         = "number"
-  default      = "8"
+  default      = "4"
   mutable      = true
   icon         = "/icon/memory.svg"
 
@@ -105,7 +98,7 @@ data "coder_parameter" "memory" {
   display_name = "Memory (GB)"
   description  = "Memory allocation for the workspace pod"
   type         = "number"
-  default      = "16"
+  default      = "8"
   mutable      = true
   icon         = "/icon/memory.svg"
 
@@ -136,7 +129,7 @@ data "coder_parameter" "disk_size" {
   display_name = "Disk Size (GB)"
   description  = "Persistent volume size — cannot be changed after creation"
   type         = "number"
-  default      = "50"
+  default      = "20"
   mutable      = false
   icon         = "/icon/database.svg"
 
@@ -175,65 +168,7 @@ data "coder_parameter" "git_repo" {
 }
 
 # -----------------------------------------------------------------------------
-# Locals — AI Bridge URLs and tool configuration
-# -----------------------------------------------------------------------------
-
-locals {
-  # AI Bridge endpoints — proxied through Coder, authenticated via session token
-  ai_bridge_anthropic_url = "${data.coder_workspace.me.access_url}/api/v2/aibridge/anthropic"
-  ai_bridge_openai_url    = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai"
-  ai_bridge_openai_v1_url = "${data.coder_workspace.me.access_url}/api/v2/aibridge/openai/v1"
-
-  # Claude Code settings.json — written to ~/.claude/settings.json
-  # Controls environment variables, model selection, and onboarding state
-  claude_settings = {
-    env = {
-      ANTHROPIC_BASE_URL  = local.ai_bridge_anthropic_url
-      OPENAI_BASE_URL     = local.ai_bridge_openai_url
-      GH_TOKEN            = data.coder_external_auth.github.access_token
-      GH_USERNAME         = data.coder_workspace_owner.me.name
-      GIT_AUTHOR_NAME     = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-      GIT_AUTHOR_EMAIL    = data.coder_workspace_owner.me.email
-      GIT_COMMITTER_NAME  = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-      GIT_COMMITTER_EMAIL = data.coder_workspace_owner.me.email
-    }
-    autoUpdaterStatus            = "disabled"
-    hasAcknowledgedCostThreshold = true
-    hasCompletedOnboarding       = true
-  }
-
-  # Claude Code config — written to ~/.claude.json
-  # Contains the API key (session token) and per-project onboarding state
-  claude_config = {
-    autoUpdaterStatus            = "disabled"
-    hasAcknowledgedCostThreshold = true
-    hasCompletedOnboarding       = true
-    primaryApiKey                = data.coder_workspace_owner.me.session_token
-    projects = {
-      "/home/coder" = {
-        hasCompletedProjectOnboarding = true
-        hasTrustDialogAccepted        = true
-      }
-    }
-  }
-
-  # Mux provider configuration — written to ~/.mux/providers.jsonc
-  # Configures the Anthropic provider with AI Bridge base URL and models
-  mux_provider_settings = {
-    "anthropic" = {
-      "serviceTier" = "default"
-      "models" = [
-        "claude-haiku-4-5-20251001",
-        "claude-opus-4-6-20250610"
-      ]
-      "baseUrl" = local.ai_bridge_anthropic_url
-      "apiKey"  = data.coder_workspace_owner.me.session_token
-    }
-  }
-}
-
-# -----------------------------------------------------------------------------
-# Agent — startup script installs CLIs and writes config files
+# Agent — startup script installs common dev tools
 # -----------------------------------------------------------------------------
 
 resource "coder_agent" "main" {
@@ -242,15 +177,12 @@ resource "coder_agent" "main" {
 
   # The startup script runs on every workspace start. It:
   #   1. Sets up PATH for npm global bin, ~/.local/bin
-  #   2. Installs Claude Code (native), Codex (npm), Gemini CLI (npm), Kiro CLI (curl)
-  #   3. Writes Claude Code config (settings.json + .claude.json)
-  #   4. Writes Codex config (config.toml with AI Bridge provider)
-  #   5. Writes Mux provider config (providers.jsonc)
+  #   2. Installs common development packages via apt
   startup_script = <<-EOT
     #!/bin/bash
     touch ~/.bashrc
 
-    # Set up PATH for this script (npm global bin + ~/.local/bin for native installs)
+    # Set up PATH (npm global bin + ~/.local/bin)
     NPM_BIN="$(npm config get prefix)/bin"
     export PATH="$HOME/.local/bin:$NPM_BIN:$PATH"
 
@@ -259,98 +191,32 @@ resource "coder_agent" "main" {
       grep -qF "$P" ~/.profile 2>/dev/null || echo "export PATH=\"$P:\$PATH\"" >> ~/.profile
     done
 
-    # Install C++ development toolchain and debugging tools
-    echo "Installing C++ development tools..."
+    # Install common development tools
+    echo "Installing development tools..."
     sudo apt-get update -qq
-    sudo apt-get install -y --no-install-recommends \
+    sudo apt-get install -y -qq \
+      git \
+      curl \
+      jq \
+      ripgrep \
+      fd-find \
       build-essential \
-      gcc g++ \
-      clang clang-format clang-tidy \
-      cmake \
-      make \
-      ninja-build \
-      gdb \
-      lldb \
-      valgrind \
-      ccache \
-      cppcheck \
-      strace \
-      ltrace \
-      binutils \
-      lld \
-      bear \
-      doxygen \
-      pkg-config \
-      || true
+      python3 \
+      python3-pip \
+      unzip \
+      > /dev/null 2>&1 || true
 
-    # Install Claude Code CLI (native installer — auto-updates, no Node.js dependency)
-    echo "Installing Claude Code CLI..."
-    curl -fsSL https://claude.ai/install.sh | bash || true
-
-    # Install Codex CLI
-    echo "Installing Codex CLI..."
-    sudo npm install -g @openai/codex@latest || true
-
-    # Install Gemini CLI
-    echo "Installing Gemini CLI..."
-    sudo npm install -g @google/gemini-cli@latest || true
-
-    # Install Kiro CLI
-    echo "Installing Kiro CLI..."
-    curl -fsSL https://cli.kiro.dev/install | bash || true
-
-    # Claude Code configuration
-    echo "Configuring Claude Code..."
-    mkdir -p ~/.claude
-    cat > ~/.claude/settings.json << 'CLAUDESETTINGS'
-    ${jsonencode(local.claude_settings)}
-    CLAUDESETTINGS
-    cat > ~/.claude.json << 'CLAUDECONFIG'
-    ${jsonencode(local.claude_config)}
-    CLAUDECONFIG
-
-    # Codex configuration (AI Bridge)
-    echo "Configuring Codex..."
-    mkdir -p ~/.codex
-    cat > ~/.codex/config.toml << 'CODEXEOF'
-    sandbox_mode = "workspace-write"
-    approval_policy = "never"
-    preferred_auth_method = "apikey"
-    profile = "aibridge"
-
-    [sandbox_workspace_write]
-    network_access = true
-
-    [model_providers.aibridge]
-    name = "AI Bridge"
-    base_url = "${local.ai_bridge_openai_v1_url}"
-    env_key = "OPENAI_API_KEY"
-    wire_api = "responses"
-
-    [profiles.aibridge]
-    model_provider = "aibridge"
-    model = "gpt-5.3-codex"
-    model_reasoning_effort = "medium"
-    CODEXEOF
-
-    # Mux AI provider configuration
-    echo "Configuring Mux..."
-    mkdir -p ~/.mux
-    cat > ~/.mux/providers.jsonc << 'MUXEOF'
-    ${jsonencode(local.mux_provider_settings)}
-    MUXEOF
+    # Create fd symlink (Debian/Ubuntu packages fd-find as fdfind)
+    if command -v fdfind &> /dev/null && ! command -v fd &> /dev/null; then
+      sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
+    fi
 
     echo "=== Workspace Ready ==="
   EOT
 
-  # Environment variables available to all processes in the workspace.
-  # These point AI tools at the AI Bridge proxy endpoints.
   env = {
-    EDITOR             = "code"
-    VISUAL             = "code"
-    ANTHROPIC_BASE_URL = local.ai_bridge_anthropic_url
-    ANTHROPIC_API_BASE = local.ai_bridge_anthropic_url
-    OPENAI_BASE_URL    = local.ai_bridge_openai_url
+    EDITOR = "code"
+    VISUAL = "code"
   }
 
   metadata {
@@ -379,26 +245,6 @@ resource "coder_agent" "main" {
 }
 
 # -----------------------------------------------------------------------------
-# AI Bridge API Keys — injected as env vars via coder_env
-# -----------------------------------------------------------------------------
-# These use the workspace owner's Coder session token as the "API key".
-# AI Bridge validates this token and proxies requests to the real AI providers.
-
-# CLAUDE_API_KEY — used by Claude Code CLI for authentication
-resource "coder_env" "claude_api_key" {
-  agent_id = coder_agent.main.id
-  name     = "CLAUDE_API_KEY"
-  value    = data.coder_workspace_owner.me.session_token
-}
-
-# OPENAI_API_KEY — used by Codex CLI for authentication
-resource "coder_env" "openai_api_key" {
-  agent_id = coder_agent.main.id
-  name     = "OPENAI_API_KEY"
-  value    = data.coder_workspace_owner.me.session_token
-}
-
-# -----------------------------------------------------------------------------
 # Coder Registry Modules
 # -----------------------------------------------------------------------------
 
@@ -416,7 +262,7 @@ module "code-server" {
   order     = 1
 }
 
-# mux — terminal multiplexer with built-in AI provider switching UI
+# mux — terminal multiplexer
 module "mux" {
   count     = data.coder_workspace.me.start_count
   source    = "registry.coder.com/coder/mux/coder"
@@ -426,6 +272,21 @@ module "mux" {
   group     = "Web IDEs"
   order     = 2
 }
+
+# --- Desktop IDEs ---
+
+# cursor — Cursor Desktop IDE connection (external app)
+module "cursor" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/cursor/coder"
+  version  = "1.4.1"
+  agent_id = coder_agent.main.id
+  folder   = "/home/coder"
+  group    = "Desktop IDEs"
+  order    = 3
+}
+
+# --- Utilities ---
 
 # dotfiles — clone and apply user dotfiles on workspace start
 module "dotfiles" {
