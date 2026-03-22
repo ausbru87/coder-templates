@@ -20,8 +20,12 @@
 #   Desktop IDEs:
 #     - Cursor IDE (AI-powered VS Code fork)
 #   System packages (installed on startup):
-#     - git, curl, jq, ripgrep, fd-find, build-essential
-#     - python3, python3-pip, unzip
+#     Critical: git, curl, wget, ca-certificates, openssh-client,
+#              jq, ripgrep, fd-find, build-essential, pkg-config,
+#              python3, python3-pip, unzip, tar, gzip, procps, lsof,
+#              sed, gawk
+#     Nice-to-have: tree, shellcheck, diffutils, inotify-tools,
+#                   netcat-openbsd, dnsutils
 # =============================================================================
 
 terraform {
@@ -197,16 +201,38 @@ resource "coder_agent" "main" {
     # Install common development tools
     echo "Installing development tools..."
     sudo apt-get update -qq
+
+    # Critical — needed for the agent to operate reliably
     sudo apt-get install -y -qq \
       git \
       curl \
+      wget \
+      ca-certificates \
+      openssh-client \
       jq \
       ripgrep \
       fd-find \
       build-essential \
+      pkg-config \
       python3 \
       python3-pip \
       unzip \
+      tar \
+      gzip \
+      procps \
+      lsof \
+      sed \
+      gawk \
+      > /dev/null 2>&1 || true
+
+    # Nice-to-have — improve agent speed and output quality
+    sudo apt-get install -y -qq \
+      tree \
+      shellcheck \
+      diffutils \
+      inotify-tools \
+      netcat-openbsd \
+      dnsutils \
       > /dev/null 2>&1 || true
 
     # Create fd symlink (Debian/Ubuntu packages fd-find as fdfind)
