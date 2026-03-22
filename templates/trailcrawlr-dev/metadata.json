@@ -1,0 +1,5 @@
+{
+  "display_name": "TrailCrawlr Dev Environment",
+  "description": "Fullstack dev workspace for TrailCrawlr. Includes PostGIS, Redis sidecars, Node.js, and AI tools.",
+  "icon": "/icon/database.svg"
+}
