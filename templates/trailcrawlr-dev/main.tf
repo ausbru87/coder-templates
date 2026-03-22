@@ -227,6 +227,7 @@ resource "coder_agent" "main" {
       sed \
       gawk \
       postgresql-client \
+      redis-tools \
       > /dev/null 2>&1 || true
 
     # Nice-to-have — improve agent speed and output quality
@@ -244,8 +245,8 @@ resource "coder_agent" "main" {
       sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
     fi
 
-    # Install pnpm via corepack
-    corepack enable && corepack prepare pnpm@9.15.0 --activate
+    # Install pnpm via corepack (sudo required — symlinks into /usr/bin/)
+    sudo corepack enable && corepack prepare pnpm@9.15.0 --activate
 
     # Clone TrailCrawlr repository
     git clone https://gitlab.zambruhni.com/trailcrawlr/trailcrawlr.git /home/coder/trailcrawlr || true
@@ -295,11 +296,12 @@ resource "coder_agent" "main" {
   EOT
 
   env = {
-    EDITOR            = "code"
-    VISUAL            = "code"
-    DATABASE_URL      = "postgresql://trailcrawlr:${data.coder_parameter.postgres_password.value}@localhost:5432/trailcrawlr"
-    REDIS_URL         = "redis://localhost:6379"
-    POSTGRES_PASSWORD = data.coder_parameter.postgres_password.value
+    EDITOR                     = "code"
+    VISUAL                     = "code"
+    DATABASE_URL               = "postgresql://trailcrawlr:${data.coder_parameter.postgres_password.value}@localhost:5432/trailcrawlr"
+    REDIS_URL                  = "redis://localhost:6379"
+    POSTGRES_PASSWORD          = data.coder_parameter.postgres_password.value
+    COREPACK_DEFAULT_TO_LATEST = "0"
   }
 
   metadata {
