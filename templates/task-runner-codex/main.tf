@@ -427,7 +427,7 @@ resource "kubernetes_pod_v1" "workspace" {
 
       env {
         name  = "CODER_AGENT_URL"
-        value = "http://coder.coder.svc.cluster.local"
+        value = data.coder_workspace.me.access_url
       }
 
       resources {
