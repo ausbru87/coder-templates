@@ -262,6 +262,9 @@ resource "coder_agent" "main" {
       grep -qF "$P" ~/.profile 2>/dev/null || echo "export PATH=\"$P:\$PATH\"" >> ~/.profile
     done
 
+    # Remove stale Yarn apt repo (expired GPG key causes apt-get update warnings)
+    sudo rm -f /etc/apt/sources.list.d/yarn.list 2>/dev/null || true
+
     # Install Claude Code CLI (native installer — auto-updates, no Node.js dependency)
     echo "Installing Claude Code CLI..."
     curl -fsSL https://claude.ai/install.sh | bash || true

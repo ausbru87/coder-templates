@@ -259,6 +259,9 @@ resource "coder_agent" "main" {
       grep -qF "$P" ~/.profile 2>/dev/null || echo "export PATH=\"$P:\$PATH\"" >> ~/.profile
     done
 
+    # Remove stale Yarn apt repo (expired GPG key causes apt-get update warnings)
+    sudo rm -f /etc/apt/sources.list.d/yarn.list 2>/dev/null || true
+
     # Install C++ development toolchain and debugging tools
     echo "Installing C++ development tools..."
     sudo apt-get update -qq
