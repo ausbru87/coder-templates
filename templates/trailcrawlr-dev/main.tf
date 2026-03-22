@@ -576,10 +576,14 @@ resource "kubernetes_pod_v1" "workspace" {
         }
       }
 
+      # Mount PVC at the parent directory so fsGroup ownership (GID 1000)
+      # is applied correctly. PGDATA defaults to /var/lib/postgresql/data
+      # inside the image, so postgres creates the data/ subdirectory itself.
+      # Do NOT use sub_path here — Kubernetes skips fsGroup for sub_path
+      # mounts, which causes permission-denied crashes for UID 999.
       volume_mount {
-        mount_path = "/var/lib/postgresql/data"
+        mount_path = "/var/lib/postgresql"
         name       = "pgdata"
-        sub_path   = "pgdata"
         read_only  = false
       }
     }
