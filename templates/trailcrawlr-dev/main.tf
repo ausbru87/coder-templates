@@ -53,8 +53,8 @@ data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
-data "coder_external_auth" "github" {
-  id       = "github"
+data "coder_external_auth" "gitlab" {
+  id       = "gitlab"
   optional = true
 }
 
