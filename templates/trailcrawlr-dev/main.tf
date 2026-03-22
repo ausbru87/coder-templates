@@ -251,30 +251,39 @@ resource "coder_agent" "main" {
     # Clone TrailCrawlr repository
     git clone https://gitlab.zambruhni.com/trailcrawlr/trailcrawlr.git /home/coder/trailcrawlr || true
 
-    # Wait for PostgreSQL to be ready
+    # Wait for PostgreSQL sidecar to be ready
+    # First boot is slow: image pull + initdb + PostGIS extension creation
+    # can take 2–3 minutes, so we allow up to 90 × 2s = 180s.
     echo "Waiting for PostgreSQL..."
-    for i in $(seq 1 30); do
+    PG_READY=false
+    for i in $(seq 1 90); do
       if pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
         echo "PostgreSQL is ready."
+        PG_READY=true
         break
       fi
-      echo "  ...waiting ($i/30)"
+      echo "  ...waiting ($i/90)"
       sleep 2
     done
+    if [ "$PG_READY" != "true" ]; then
+      echo "ERROR: PostgreSQL sidecar did not become ready within 180s."
+    fi
 
-    # Wait for Redis to be ready
+    # Wait for Redis sidecar to be ready
     echo "Waiting for Redis..."
-    for i in $(seq 1 30); do
+    for i in $(seq 1 90); do
       if nc -z localhost 6379 > /dev/null 2>&1; then
         echo "Redis is ready."
         break
       fi
-      echo "  ...waiting ($i/30)"
+      echo "  ...waiting ($i/90)"
       sleep 2
     done
 
-    # Create PostGIS extension
-    PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U trailcrawlr -d trailcrawlr -c "CREATE EXTENSION IF NOT EXISTS postgis;" || true
+    # Create PostGIS extension (only if PostgreSQL came up)
+    if [ "$PG_READY" = "true" ]; then
+      PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U trailcrawlr -d trailcrawlr -c "CREATE EXTENSION IF NOT EXISTS postgis;" || true
+    fi
 
     # Set up .env if it does not already exist
     mkdir -p /home/coder/trailcrawlr
